@@ -1,12 +1,14 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
 
 	"studybuddy/internal/api"
 	"studybuddy/internal/db"
+	"studybuddy/internal/handlers"
 	"studybuddy/internal/models"
 	"studybuddy/internal/ws"
 
@@ -20,8 +22,14 @@ func main() {
 	hub := ws.NewHub()
 	go hub.Run()
 
+	// Set the global hub reference so handlers can broadcast
+	handlers.GlobalHub = hub
+
 	r := mux.NewRouter()
 	api.RegisterRoutes(r)
+
+	// serve uploaded files from ./uploads under /uploads/
+	r.PathPrefix("/uploads/").Handler(http.StripPrefix("/uploads/", http.FileServer(http.Dir("./uploads/"))))
 
 	r.HandleFunc("/ws/{groupID}", func(w http.ResponseWriter, r *http.Request) {
 		ws.ServeWS(hub, w, r)
@@ -37,16 +45,28 @@ func main() {
 	})
 
 	hub.SaveMessageFunc = func(msg ws.Message) error {
-		parts := strings.SplitN(string(msg.Data), ": ", 2)
-		if len(parts) != 2 {
-			return nil
+		// Try to parse as JSON (new format with { content: "..." })
+		var msgObj map[string]interface{}
+		var content string
+
+		if err := json.Unmarshal(msg.Data, &msgObj); err == nil && msgObj["content"] != nil {
+			// New JSON format
+			if c, ok := msgObj["content"].(string); ok {
+				content = c
+			}
+		} else {
+			// Fallback: try old "Sender: content" format (won't work well but keep for compat)
+			parts := strings.SplitN(string(msg.Data), ": ", 2)
+			if len(parts) != 2 {
+				return nil
+			}
+			content = parts[1]
 		}
-		sender := parts[0]
-		content := parts[1]
+
 		return db.SaveMessage(db.DB, models.Message{
-			GroupID: msg.GroupID,
-			Sender:  sender,
-			Content: content,
+			GroupID:  msg.GroupID,
+			SenderID: msg.UserID,
+			Content:  content,
 		})
 	}
 
