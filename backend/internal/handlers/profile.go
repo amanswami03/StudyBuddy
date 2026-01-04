@@ -21,10 +21,19 @@ import (
 type UpdateProfileRequest struct {
 	Username             *string `json:"username,omitempty"`
 	ProfilePic           *string `json:"profile_pic,omitempty"`
+	Bio                  *string `json:"bio,omitempty"`
+	Phone                *string `json:"phone,omitempty"`
+	Location             *string `json:"location,omitempty"`
+	University           *string `json:"university,omitempty"`
+	Major                *string `json:"major,omitempty"`
 	ShowLastSeen         *bool   `json:"show_last_seen,omitempty"`
 	ShowOnline           *bool   `json:"show_online,omitempty"`
-	Phone                *string `json:"phone,omitempty"`
 	NotificationsEnabled *bool   `json:"notifications_enabled,omitempty"`
+	ShowEmail            *bool   `json:"show_email,omitempty"`
+	ShowPhone            *bool   `json:"show_phone,omitempty"`
+	ShowLocation         *bool   `json:"show_location,omitempty"`
+	ShowUniversity       *bool   `json:"show_university,omitempty"`
+	ShowBio              *bool   `json:"show_bio,omitempty"`
 }
 
 type ChangeEmailRequest struct {
@@ -41,6 +50,11 @@ type DeleteAccountRequest struct {
 	Password string `json:"password"`
 }
 
+type ChangePasswordRequest struct {
+	CurrentPassword string `json:"current_password"`
+	NewPassword     string `json:"new_password"`
+}
+
 func GetProfile(w http.ResponseWriter, r *http.Request) {
 	userID, err := GetUserIDFromRequest(r)
 	if err != nil {
@@ -50,11 +64,10 @@ func GetProfile(w http.ResponseWriter, r *http.Request) {
 
 	var user models.User
 	err = db.DB.QueryRow(`
-		SELECT id, username, email, profile_pic, last_seen, is_online, show_last_seen, show_online, phone, notifications_enabled, created_at
+		SELECT id, username, email, profile_pic, bio, phone, location, university, major, last_seen, is_online, show_last_seen, show_online, notifications_enabled, show_email, show_phone, show_location, show_university, show_bio, created_at
 		FROM users WHERE id=$1`, userID).Scan(
-		&user.ID, &user.Username, &user.Email, &user.ProfilePic, &user.LastSeen,
-		&user.IsOnline, &user.ShowLastSeen, &user.ShowOnline, &user.Phone,
-		&user.NotificationsEnabled, &user.CreatedAt)
+		&user.ID, &user.Username, &user.Email, &user.ProfilePic, &user.Bio, &user.Phone, &user.Location, &user.University, &user.Major, &user.LastSeen,
+		&user.IsOnline, &user.ShowLastSeen, &user.ShowOnline, &user.NotificationsEnabled, &user.ShowEmail, &user.ShowPhone, &user.ShowLocation, &user.ShowUniversity, &user.ShowBio, &user.CreatedAt)
 	if err != nil {
 		http.Error(w, "User not found", http.StatusNotFound)
 		return
@@ -75,14 +88,33 @@ func GetPublicProfile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var user models.User
+	var showEmail, showPhone, showLocation, showUniversity, showBio bool
+	
 	err = db.DB.QueryRow(`
-		SELECT id, username, email, profile_pic, last_seen, is_online, show_last_seen, show_online, phone, created_at
+		SELECT id, username, email, profile_pic, bio, last_seen, is_online, show_last_seen, show_online, phone, created_at, show_email, show_phone, show_location, show_university, show_bio
 		FROM users WHERE id=$1`, userID).Scan(
-		&user.ID, &user.Username, &user.Email, &user.ProfilePic, &user.LastSeen,
-		&user.IsOnline, &user.ShowLastSeen, &user.ShowOnline, &user.Phone, &user.CreatedAt)
+		&user.ID, &user.Username, &user.Email, &user.ProfilePic, &user.Bio, &user.LastSeen,
+		&user.IsOnline, &user.ShowLastSeen, &user.ShowOnline, &user.Phone, &user.CreatedAt, &showEmail, &showPhone, &showLocation, &showUniversity, &showBio)
 	if err != nil {
 		http.Error(w, "User not found", http.StatusNotFound)
 		return
+	}
+
+	// Apply privacy settings
+	if !showEmail {
+		user.Email = ""
+	}
+	if !showPhone {
+		user.Phone = nil
+	}
+	if !showLocation {
+		user.Location = nil
+	}
+	if !showUniversity {
+		user.University = nil
+	}
+	if !showBio {
+		user.Bio = nil
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -117,6 +149,11 @@ func UpdateProfile(w http.ResponseWriter, r *http.Request) {
 		args = append(args, *req.ProfilePic)
 		argCount++
 	}
+	if req.Bio != nil {
+		setParts = append(setParts, "bio=$"+strconv.Itoa(argCount))
+		args = append(args, *req.Bio)
+		argCount++
+	}
 	if req.ShowLastSeen != nil {
 		setParts = append(setParts, "show_last_seen=$"+strconv.Itoa(argCount))
 		args = append(args, *req.ShowLastSeen)
@@ -132,15 +169,50 @@ func UpdateProfile(w http.ResponseWriter, r *http.Request) {
 		args = append(args, *req.Phone)
 		argCount++
 	}
+	if req.Location != nil {
+		setParts = append(setParts, "location=$"+strconv.Itoa(argCount))
+		args = append(args, *req.Location)
+		argCount++
+	}
+	if req.University != nil {
+		setParts = append(setParts, "university=$"+strconv.Itoa(argCount))
+		args = append(args, *req.University)
+		argCount++
+	}
+	if req.Major != nil {
+		setParts = append(setParts, "major=$"+strconv.Itoa(argCount))
+		args = append(args, *req.Major)
+		argCount++
+	}
 	if req.NotificationsEnabled != nil {
 		setParts = append(setParts, "notifications_enabled=$"+strconv.Itoa(argCount))
 		args = append(args, *req.NotificationsEnabled)
 		argCount++
 	}
-
-	if len(setParts) == 0 {
-		http.Error(w, "No fields to update", http.StatusBadRequest)
-		return
+	if req.ShowEmail != nil {
+		setParts = append(setParts, "show_email=$"+strconv.Itoa(argCount))
+		args = append(args, *req.ShowEmail)
+		argCount++
+	}
+	if req.ShowPhone != nil {
+		setParts = append(setParts, "show_phone=$"+strconv.Itoa(argCount))
+		args = append(args, *req.ShowPhone)
+		argCount++
+	}
+	if req.ShowLocation != nil {
+		setParts = append(setParts, "show_location=$"+strconv.Itoa(argCount))
+		args = append(args, *req.ShowLocation)
+		argCount++
+	}
+	if req.ShowUniversity != nil {
+		setParts = append(setParts, "show_university=$"+strconv.Itoa(argCount))
+		args = append(args, *req.ShowUniversity)
+		argCount++
+	}
+	if req.ShowBio != nil {
+		setParts = append(setParts, "show_bio=$"+strconv.Itoa(argCount))
+		args = append(args, *req.ShowBio)
+		argCount++
 	}
 
 	query := "UPDATE users SET " + strings.Join(setParts, ", ") + " WHERE id=$" + strconv.Itoa(argCount)
@@ -320,4 +392,67 @@ func UploadProfilePhoto(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
+}
+func ChangePassword(w http.ResponseWriter, r *http.Request) {
+	userID, err := GetUserIDFromRequest(r)
+	if err != nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	var req ChangePasswordRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request", http.StatusBadRequest)
+		return
+	}
+
+	// Validate inputs
+	if req.CurrentPassword == "" || req.NewPassword == "" {
+		http.Error(w, "Current password and new password are required", http.StatusBadRequest)
+		return
+	}
+
+	if req.NewPassword == req.CurrentPassword {
+		http.Error(w, "New password must be different from current password", http.StatusBadRequest)
+		return
+	}
+
+	if len(req.NewPassword) < 6 {
+		http.Error(w, "New password must be at least 6 characters long", http.StatusBadRequest)
+		return
+	}
+
+	// Get current password hash
+	var hashedPassword string
+	err = db.DB.QueryRow(`SELECT password FROM users WHERE id=$1`, userID).Scan(&hashedPassword)
+	if err != nil {
+		http.Error(w, "User not found", http.StatusNotFound)
+		return
+	}
+
+	// Verify current password
+	if err := bcrypt.CompareHashAndPassword([]byte(hashedPassword), []byte(req.CurrentPassword)); err != nil {
+		http.Error(w, "Current password is incorrect", http.StatusUnauthorized)
+		return
+	}
+
+	// Hash new password
+	newHashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
+	if err != nil {
+		http.Error(w, "Failed to process password", http.StatusInternalServerError)
+		return
+	}
+
+	// Update password in database
+	_, err = db.DB.Exec(`UPDATE users SET password=$1 WHERE id=$2`, newHashedPassword, userID)
+	if err != nil {
+		http.Error(w, "Failed to update password", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{
+		"message": "Password changed successfully",
+	})
 }

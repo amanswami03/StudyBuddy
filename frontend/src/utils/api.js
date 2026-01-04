@@ -88,6 +88,12 @@ export const deleteAccount = (password) =>
     body: JSON.stringify({ password }),
   });
 
+export const changePassword = (currentPassword, newPassword) =>
+  apiCall('/api/profile/password', {
+    method: 'PUT',
+    body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
+  });
+
 // ============ GROUPS ENDPOINTS ============
 
 // List all groups
@@ -116,6 +122,67 @@ export const joinGroup = (groupId) =>
 export const leaveGroup = (groupId) =>
   apiCall(`/api/groups/${groupId}/leave`, {
     method: 'POST',
+  });
+
+// Search groups by name or username
+export const searchGroups = (query) =>
+  apiCall(`/api/groups/search?q=${encodeURIComponent(query)}`);
+
+// Get group members
+export const getGroupMembers = (groupId) =>
+  apiCall(`/api/groups/${groupId}/members`);
+
+// Remove member from group (admin only)
+export const removeGroupMember = (groupId, userId) =>
+  apiCall(`/api/groups/${groupId}/members/${userId}/remove`, {
+    method: 'POST',
+  });
+
+// Make user admin (admin only)
+export const makeGroupAdmin = (groupId, userId) =>
+  apiCall(`/api/groups/${groupId}/members/${userId}/make-admin`, {
+    method: 'POST',
+  });
+
+// Remove admin status (admin only)
+export const removeGroupAdmin = (groupId, userId) =>
+  apiCall(`/api/groups/${groupId}/members/${userId}/remove-admin`, {
+    method: 'POST',
+  });
+
+// Update group settings (admin only)
+export const updateGroup = (groupId, groupData) =>
+  apiCall(`/api/groups/${groupId}`, {
+    method: 'PUT',
+    body: JSON.stringify(groupData),
+  });
+
+// Delete group (admin only) - requires password verification
+export const deleteGroup = (groupId, password) =>
+  apiCall(`/api/groups/${groupId}`, {
+    method: 'DELETE',
+    body: JSON.stringify({ password }),
+  });
+
+// Check if user can view content in group
+export const canViewGroupContent = (groupId) =>
+  apiCall(`/api/groups/${groupId}/can-view-content`);
+
+// Get pending join requests for a group (admin only)
+export const getGroupJoinRequests = (groupId) =>
+  apiCall(`/api/groups/${groupId}/join-requests`);
+
+// Approve a join request (admin only)
+export const approveJoinRequest = (groupId, requestId) =>
+  apiCall(`/api/groups/${groupId}/join-requests/${requestId}/approve`, {
+    method: 'POST',
+  });
+
+// Reject a join request (admin only)
+export const rejectJoinRequest = (groupId, requestId, reason = '') =>
+  apiCall(`/api/groups/${groupId}/join-requests/${requestId}/reject`, {
+    method: 'POST',
+    body: JSON.stringify({ reason }),
   });
 
 // Get group messages
@@ -214,6 +281,50 @@ export const getUserStudySessions = () => apiCall('/api/study/sessions');
 // Get study statistics
 export const getStudyStats = () => apiCall('/api/study/stats');
 
+// ============ GROUP SCHEDULED SESSIONS ENDPOINTS ============
+
+// Create a scheduled session for a group
+export const createGroupSession = (groupId, sessionData) =>
+  apiCall(`/api/groups/${groupId}/sessions/create`, {
+    method: 'POST',
+    body: JSON.stringify(sessionData),
+  });
+
+// Get all sessions for a group
+export const getGroupSessions = (groupId) =>
+  apiCall(`/api/groups/${groupId}/sessions`);
+
+// Get all upcoming sessions for the current user across all groups
+export const getUserUpcomingSessions = () =>
+  apiCall('/api/user/upcoming-sessions');
+
+// Get a single session details
+export const getGroupSession = (sessionId) =>
+  apiCall(`/api/groups/sessions/${sessionId}`);
+
+// Join a group session
+export const joinGroupSession = (sessionId, status = 'attending') =>
+  apiCall(`/api/groups/sessions/${sessionId}/join`, {
+    method: 'POST',
+    body: JSON.stringify({ status }),
+  });
+
+// Vote for a session time option
+export const voteForSessionTime = (sessionId, optionId) =>
+  apiCall(`/api/groups/sessions/${sessionId}/vote?option_id=${optionId}`, {
+    method: 'POST',
+  });
+
+// Get session attendees
+export const getSessionAttendees = (sessionId) =>
+  apiCall(`/api/groups/sessions/${sessionId}/attendees`);
+
+// Delete a scheduled session (admin only)
+export const deleteGroupSession = (sessionId) =>
+  apiCall(`/api/groups/sessions/${sessionId}`, {
+    method: 'DELETE',
+  });
+
 // ============ EXAMPLE USAGE IN COMPONENTS ============
 
 /*
@@ -301,3 +412,49 @@ useEffect(() => {
   loadUserData();
 }, []);
 */
+// Group Resources API calls
+export const getGroupResources = (groupId) =>
+  apiCall(`/api/groups/${groupId}/resources`, { method: 'GET' }).then(res => res.resources || []);
+
+export const uploadGroupResource = (groupId, file) => {
+  const token = getToken();
+  const formData = new FormData();
+  formData.append('file', file);
+
+  return fetch(`${API_BASE}/api/groups/${groupId}/resources/upload`, {
+    method: 'POST',
+    body: formData,
+    headers: {
+      ...(token && { 'Authorization': `Bearer ${token}` }),
+    },
+  }).then(async response => {
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.message || `Upload failed with status ${response.status}`);
+    }
+    return response.json();
+  });
+};
+
+// ============ NOTIFICATIONS ENDPOINTS ============
+
+// Get user notifications
+export const getUserNotifications = (limit = 20) =>
+  apiCall(`/api/user/notifications?limit=${limit}`);
+
+// Mark notification as read
+export const markNotificationAsRead = (notificationId) =>
+  apiCall('/api/user/notifications/read', {
+    method: 'POST',
+    body: JSON.stringify({ notification_id: notificationId }),
+  });
+
+// Get unread notification count
+export const getUnreadNotificationCount = () =>
+  apiCall('/api/user/notifications/unread-count');
+
+export const downloadGroupResource = (resourceId) =>
+  apiCall(`/api/resources/${resourceId}/download`, { method: 'GET' });
+
+export const deleteGroupResource = (resourceId) =>
+  apiCall(`/api/resources/${resourceId}`, { method: 'DELETE' });

@@ -235,10 +235,12 @@ func GetUserActivityStats(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Count messages sent by user (sessions attended proxy)
+	// Count scheduled group sessions the user is attending
 	var sessionsAttended int
 	err = db.DB.QueryRow(`
-		SELECT COUNT(*) FROM messages WHERE sender_id = $1
+		SELECT COUNT(*) FROM scheduled_group_sessions sgs
+		INNER JOIN group_members gm ON gm.group_id = sgs.group_id
+		WHERE gm.user_id = $1 AND sgs.start_time <= NOW()
 	`, userID).Scan(&sessionsAttended)
 	if err != nil {
 		sessionsAttended = 0
@@ -272,12 +274,22 @@ func GetUserActivityStats(w http.ResponseWriter, r *http.Request) {
 		resourcesShared = 0
 	}
 
+	// Get login streak from user_ranks
+	var loginStreak int
+	err = db.DB.QueryRow(`
+		SELECT COALESCE(login_streak, 0) FROM user_ranks WHERE user_id = $1
+	`, userID).Scan(&loginStreak)
+	if err != nil {
+		loginStreak = 0
+	}
+
 	response := map[string]interface{}{
 		"user_id":           userID,
 		"study_hours":       studyHours,
 		"sessions_attended": sessionsAttended,
 		"groups_joined":     groupsJoined,
 		"resources_shared":  resourcesShared,
+		"login_streak":      loginStreak,
 	}
 
 	w.Header().Set("Content-Type", "application/json")

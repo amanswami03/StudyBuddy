@@ -73,3 +73,23 @@ body {
   opacity: 1;
   transform: translateY(0);
 }
+
+/* Font Size Controls */
+:root {
+  --font-size-multiplier: 1;
+}
+
+html.font-small {
+  --font-size-multiplier: 0.875;
+  font-size: 14px;
+}
+
+html.font-medium {
+  --font-size-multiplier: 1;
+  font-size: 16px;
+}
+
+html.font-large {
+  --font-size-multiplier: 1.125;
+  font-size: 18px;
+}

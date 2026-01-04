@@ -2,6 +2,7 @@ package db
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"log"
 	"time"
@@ -89,12 +90,18 @@ func AddPoints(userID int, action PointsAction, details map[string]interface{}) 
 		}
 	}
 
+	// Convert details map to JSON
+	detailsJSON, err := json.Marshal(details)
+	if err != nil {
+		return fmt.Errorf("failed to marshal action details: %v", err)
+	}
+
 	// Insert into ledger
 	query := `
 		INSERT INTO user_points_ledger (user_id, points_change, action_type, action_details)
 		VALUES ($1, $2, $3, $4)
 	`
-	_, err := DB.Exec(query, userID, points, action, details)
+	_, err = DB.Exec(query, userID, points, action, detailsJSON)
 	if err != nil {
 		return err
 	}

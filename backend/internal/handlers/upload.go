@@ -107,6 +107,12 @@ func UploadMessage(w http.ResponseWriter, r *http.Request) {
 		fmt.Println("failed to save uploaded message:", err)
 	}
 
+	// Also create a resource entry so the file appears in Resources tab
+	_, err = db.CreateGroupResource(groupID, uid, header.Filename, fileURL, header.Size, header.Header.Get("Content-Type"))
+	if err != nil {
+		fmt.Println("failed to create resource entry:", err)
+	}
+
 	// Broadcast to group's hub so all connected clients get notified
 	payload := map[string]interface{}{
 		"id":           messageID,

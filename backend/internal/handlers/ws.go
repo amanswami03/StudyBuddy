@@ -49,12 +49,25 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Optional: check if user is member of group. For public groups you may skip.
-	var exists bool
-	_ = db.DB.QueryRow(`SELECT EXISTS(SELECT 1 FROM group_members WHERE group_id=$1 AND user_id=$2)`, groupID, uid).Scan(&exists)
-	if !exists {
-		// For public groups you can add the user as a member automatically:
-		_, _ = db.DB.Exec(`INSERT INTO group_members (group_id, user_id) VALUES ($1,$2) ON CONFLICT DO NOTHING`, groupID, uid)
+	// Check if user is a member of group (security check)
+	var isMember bool
+	err = db.DB.QueryRow(`SELECT EXISTS(SELECT 1 FROM group_members WHERE group_id=$1 AND user_id=$2)`, groupID, uid).Scan(&isMember)
+	if err != nil || !isMember {
+		// Check if user has a pending join request
+		var hasPending bool
+		_ = db.DB.QueryRow(`SELECT EXISTS(SELECT 1 FROM join_requests WHERE group_id=$1 AND user_id=$2 AND status='pending')`, groupID, uid).Scan(&hasPending)
+		if hasPending {
+			http.Error(w, "your join request is pending admin approval", http.StatusForbidden)
+			return
+		}
+		// Check if group is public and allows without join (optional)
+		var allowWithoutJoin bool
+		_ = db.DB.QueryRow(`SELECT allow_content_view_without_join FROM groups WHERE id=$1`, groupID).Scan(&allowWithoutJoin)
+		if !allowWithoutJoin {
+			http.Error(w, "you are not a member of this group", http.StatusForbidden)
+			return
+		}
+		// Don't auto-add users, they must join properly first
 	}
 
 	conn, err := upgrader.Upgrade(w, r, nil)
@@ -68,6 +81,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 		Conn:    conn,
 		Send:    make(chan []byte, 256),
 		GroupID: strconv.Itoa(groupID),
+		UserID:  uid,
 	}
 	hub.Register <- client
 
@@ -120,6 +134,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 		hub.Broadcast <- ws.Message{
 			GroupID: strconv.Itoa(groupID),
 			Data:    out,
+			UserID:  uid,
 		}
 	}
 

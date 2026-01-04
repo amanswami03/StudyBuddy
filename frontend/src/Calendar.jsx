@@ -1,71 +1,59 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock, Users, Video, MapPin, Plus } from 'lucide-react';
+import { getUserUpcomingSessions } from './utils/api';
 
 export default function Calendar() {
-  const [currentDate, setCurrentDate] = useState(new Date(2025, 10, 9)); // Nov 9, 2025
+  const [currentDate, setCurrentDate] = useState(new Date()); // Current date
   const [view, setView] = useState('month'); // month, week, day
+  const [upcomingSessions, setUpcomingSessions] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
-  // Mock events
-  const events = [
-    {
-      id: 1,
-      title: 'Data Structures Study Session',
-      group: 'Data Structures & Algorithms',
-      date: new Date(2025, 10, 9),
-      startTime: '15:00',
-      endTime: '17:00',
-      attendees: 8,
-      color: 'blue',
-      type: 'study'
-    },
-    {
-      id: 2,
-      title: 'React Workshop',
-      group: 'React & Frontend Development',
-      date: new Date(2025, 10, 10),
-      startTime: '17:00',
-      endTime: '18:30',
-      attendees: 5,
-      color: 'purple',
-      type: 'study'
-    },
-    {
-      id: 3,
-      title: 'ML Study Group',
-      group: 'Machine Learning Study Group',
-      date: new Date(2025, 10, 13),
-      startTime: '16:00',
-      endTime: '18:00',
-      attendees: 12,
-      color: 'green',
-      type: 'study'
-    },
-    {
-      id: 4,
-      title: 'Algorithm Practice',
-      group: 'Data Structures & Algorithms',
-      date: new Date(2025, 10, 14),
-      startTime: '14:00',
-      endTime: '16:00',
-      attendees: 10,
-      color: 'blue',
-      type: 'study'
-    },
-    {
-      id: 5,
-      title: 'Project Review',
-      group: 'React & Frontend Development',
-      date: new Date(2025, 10, 15),
-      startTime: '18:00',
-      endTime: '19:30',
-      attendees: 6,
-      color: 'purple',
-      type: 'study'
-    }
-  ];
+  // Fetch upcoming sessions on mount
+  useEffect(() => {
+    const loadSessions = async () => {
+      try {
+        setLoading(true);
+        setError('');
+        const sessions = await getUserUpcomingSessions();
+        console.log('Loaded sessions:', sessions);
+        setUpcomingSessions(sessions || []);
+      } catch (err) {
+        console.error('Failed to load upcoming sessions:', err);
+        setError(err.message || 'Failed to load sessions');
+        setUpcomingSessions([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    loadSessions();
+  }, []);
+
+  // Convert sessions to calendar events
+  const events = upcomingSessions.map((session, idx) => {
+    const sessionDate = new Date(session.scheduled_time);
+    const colors = ['blue', 'purple', 'green', 'orange', 'pink', 'indigo', 'yellow', 'teal'];
+    const color = colors[idx % colors.length];
+    
+    return {
+      id: session.id,
+      title: session.title,
+      group: `Group ${session.group_id}`,
+      date: sessionDate,
+      startTime: sessionDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false }),
+      endTime: new Date(sessionDate.getTime() + session.duration_minutes * 60000).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false }),
+      attendees: session.attendee_count || 0,
+      duration: session.duration_minutes || 0,
+      color: color,
+      type: 'study',
+      description: session.description,
+      createdByName: session.created_by_name,
+    };
+  });
 
   const getDaysInMonth = (date) => {
     const year = date.getFullYear();
@@ -281,6 +269,11 @@ export default function Calendar() {
                         <Users className="w-3 h-3" />
                         <span>{event.attendees} attending</span>
                       </div>
+                      {event.createdByName && (
+                        <div className="flex items-center space-x-1">
+                          <span className="text-gray-500">Hosted by {event.createdByName}</span>
+                        </div>
+                      )}
                     </div>
                     <button className="mt-2 text-xs text-blue-600 hover:text-blue-700 font-medium">
                       View Details →
@@ -290,23 +283,30 @@ export default function Calendar() {
               </div>
             </div>
 
-            {/* Legend */}
+            {/* Legend - Dynamic groups from sessions */}
             <div className="bg-white rounded-xl p-6 border border-gray-200">
-              <h3 className="font-semibold text-gray-900 mb-4">Groups</h3>
-              <div className="space-y-2">
-                <div className="flex items-center space-x-2">
-                  <div className="w-4 h-4 bg-blue-500 rounded"></div>
-                  <span className="text-sm text-gray-700">Data Structures</span>
+              <h3 className="font-semibold text-gray-900 mb-4">Upcoming Sessions</h3>
+              {loading ? (
+                <p className="text-sm text-gray-500">Loading sessions...</p>
+              ) : error ? (
+                <p className="text-sm text-red-600">{error}</p>
+              ) : events.length > 0 ? (
+                <div className="space-y-2">
+                  {events.slice(0, 5).map(event => (
+                    <div key={event.id} className="flex items-start space-x-2">
+                      <div className={`w-3 h-3 rounded-full mt-1 flex-shrink-0 bg-${event.color}-500`}></div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-900 truncate">{event.title}</p>
+                        <p className="text-xs text-gray-500">
+                          {event.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-                <div className="flex items-center space-x-2">
-                  <div className="w-4 h-4 bg-purple-500 rounded"></div>
-                  <span className="text-sm text-gray-700">React Workshop</span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <div className="w-4 h-4 bg-green-500 rounded"></div>
-                  <span className="text-sm text-gray-700">ML Study Group</span>
-                </div>
-              </div>
+              ) : (
+                <p className="text-sm text-gray-500">No upcoming sessions scheduled</p>
+              )}
             </div>
 
             {/* Quick Stats */}
@@ -314,12 +314,8 @@ export default function Calendar() {
               <h3 className="font-semibold mb-4">This Month</h3>
               <div className="space-y-3">
                 <div>
-                  <p className="text-3xl font-bold">12</p>
+                  <p className="text-3xl font-bold">{events.length}</p>
                   <p className="text-sm text-blue-100">Sessions Scheduled</p>
-                </div>
-                <div>
-                  <p className="text-3xl font-bold">24h</p>
-                  <p className="text-sm text-blue-100">Study Time</p>
                 </div>
               </div>
             </div>

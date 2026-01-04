@@ -1,13 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { Play, Pause, StopCircle, Clock } from 'lucide-react';
 import { startStudySession, endStudySession, getUserStudySessions } from '../utils/api';
+import { useConnection } from '../App';
+import { useTheme } from '../contexts/ThemeContext';
 
 export default function StudyTimer({ onSessionEnd }) {
+  const { isOnline } = useConnection();
+  const { theme } = useTheme();
   const [isRunning, setIsRunning] = useState(false);
   const [sessionTime, setSessionTime] = useState(0);
   const [sessionId, setSessionId] = useState(null);
   const [displayTime, setDisplayTime] = useState('00:00:00');
   const [loading, setLoading] = useState(false);
+  const [wasAutoStopped, setWasAutoStopped] = useState(false);
 
   // Check for active session on mount
   useEffect(() => {
@@ -33,6 +38,15 @@ export default function StudyTimer({ onSessionEnd }) {
 
     restoreActiveSession();
   }, []);
+
+  // Auto-pause when going offline
+  useEffect(() => {
+    if (!isOnline && isRunning && sessionId) {
+      setIsRunning(false);
+      setWasAutoStopped(true);
+      console.log('Study timer paused due to offline status');
+    }
+  }, [isOnline, isRunning, sessionId]);
 
   // Timer effect
   useEffect(() => {
@@ -76,7 +90,12 @@ export default function StudyTimer({ onSessionEnd }) {
   };
 
   const handleResume = () => {
-    setIsRunning(true);
+    if (isOnline) {
+      setIsRunning(true);
+      setWasAutoStopped(false);
+    } else {
+      alert('Cannot resume - you are currently offline');
+    }
   };
 
   const handleStop = async () => {
@@ -96,6 +115,7 @@ export default function StudyTimer({ onSessionEnd }) {
       setSessionId(null);
       setSessionTime(0);
       setDisplayTime('00:00:00');
+      setWasAutoStopped(false);
       
       // Callback to parent to refresh stats
       if (onSessionEnd) {
@@ -110,21 +130,30 @@ export default function StudyTimer({ onSessionEnd }) {
   };
 
   return (
-    <div className="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-2xl p-6 border border-blue-100">
+    <div className={`rounded-2xl p-6 border ${theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-gradient-to-br from-blue-50 to-cyan-50 border-blue-100'}`}>
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center space-x-2">
-          <Clock className="w-6 h-6 text-blue-600" />
-          <h3 className="text-lg font-semibold text-gray-900">Study Timer</h3>
+          <Clock className={`w-6 h-6 ${theme === 'dark' ? 'text-cyan-400' : 'text-blue-600'}`} />
+          <h3 className={`text-lg font-semibold ${theme === 'dark' ? 'text-gray-100' : 'text-gray-900'}`}>Study Timer</h3>
         </div>
+        {!isOnline && (
+          <span className={`text-xs font-medium px-3 py-1 rounded-full flex items-center gap-1 ${theme === 'dark' ? 'bg-red-900/50 text-red-300' : 'bg-red-100 text-red-700'}`}>
+            <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
+            Offline
+          </span>
+        )}
       </div>
 
       {/* Timer Display */}
-      <div className="bg-white rounded-xl p-8 mb-6 text-center border-2 border-blue-200">
-        <p className="text-5xl font-bold text-blue-600 font-mono tracking-wider">
+      <div className={`rounded-xl p-8 mb-6 text-center border-2 ${theme === 'dark' ? 'bg-gray-900 border-gray-700' : 'bg-white border-blue-200'}`}>
+        <p className={`text-5xl font-bold font-mono tracking-wider ${theme === 'dark' ? 'text-cyan-400' : 'text-blue-600'}`}>
           {displayTime}
         </p>
-        <p className="text-sm text-gray-500 mt-2">
-          {sessionId ? 'Session Active' : 'Ready to study'}
+        <p className={`text-sm mt-2 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
+          {!sessionId && 'Ready to study'}
+          {sessionId && isRunning && 'Session Running'}
+          {sessionId && !isRunning && wasAutoStopped && 'Paused (offline)'}
+          {sessionId && !isRunning && !wasAutoStopped && 'Session Paused'}
         </p>
       </div>
 
@@ -133,7 +162,7 @@ export default function StudyTimer({ onSessionEnd }) {
         {!sessionId ? (
           <button
             onClick={handleStart}
-            disabled={loading}
+            disabled={loading || !isOnline}
             className="flex items-center space-x-2 bg-green-500 hover:bg-green-600 text-white px-6 py-3 rounded-lg font-medium transition-colors disabled:opacity-50"
           >
             <Play className="w-5 h-5" />
@@ -171,7 +200,7 @@ export default function StudyTimer({ onSessionEnd }) {
         )}
       </div>
 
-      <p className="text-xs text-gray-500 text-center mt-4">
+      <p className={`text-xs text-center mt-4 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
         Your study time is tracked accurately from start to end
       </p>
     </div>

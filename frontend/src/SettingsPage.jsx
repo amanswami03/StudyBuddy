@@ -1,24 +1,91 @@
-import React, { useState } from 'react';
-import { ArrowLeft, User, Mail, Lock, Bell, Shield, Eye, EyeOff, Palette, Smartphone, Save, Check, Camera, MapPin, Briefcase, BookOpen, Globe, Moon, Sun, Monitor, Type, AlertCircle, Trash2, Power, ChevronRight, X } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { ArrowLeft, User, Mail, Lock, Shield, Eye, EyeOff, Palette, Smartphone, Save, Check, Camera, MapPin, Briefcase, BookOpen, Globe, Moon, Sun, Monitor, Type, AlertCircle, Trash2, Power, ChevronRight, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { getProfile, updateProfile, changePassword } from './utils/api';
+import { useTheme } from './contexts/ThemeContext';
+
+// Get API base URL for photo access
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080';
 
 export default function SettingsPage() {
   const navigate = useNavigate();
+  const { theme, setTheme, fontSize, setFontSize } = useTheme();
   const [activeSection, setActiveSection] = useState('profile');
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [savingPassword, setSavingPassword] = useState(false);
 
   const [profileData, setProfileData] = useState({
-    name: 'John Doe',
-    email: 'john.doe@university.edu',
-    phone: '+1 (555) 123-4567',
-    location: 'San Francisco, CA',
-    university: 'Stanford University',
-    major: 'Computer Science',
-    bio: 'Passionate about algorithms and data structures. Always eager to learn and help others grow.'
+    name: '',
+    email: '',
+    phone: '',
+    location: '',
+    university: '',
+    major: '',
+    bio: '',
+    photoUrl: null
   });
+
+  const [initialProfileData, setInitialProfileData] = useState({...profileData});
+
+  // Helper function to get theme-aware classes
+  const getThemeClass = (lightClass, darkClass) => {
+    return theme === 'dark' ? darkClass : lightClass;
+  };
+
+  // Load user profile on mount
+  useEffect(() => {
+    const loadProfile = async () => {
+      try {
+        const token = localStorage.getItem('sb_token');
+        if (!token) {
+          setLoading(false);
+          return;
+        }
+
+        const data = await getProfile();
+        
+        // Convert profile_pic to absolute URL if it's relative
+        let photoUrl = data.profile_pic || null;
+        if (photoUrl && !photoUrl.startsWith('http')) {
+          photoUrl = `${API_BASE}${photoUrl}`;
+        }
+
+        const newProfileData = {
+          name: data.username || '',
+          email: data.email || '',
+          phone: data.phone || '',
+          location: data.location || '',
+          university: data.university || '',
+          major: data.major || '',
+          bio: data.bio || '',
+          photoUrl: photoUrl
+        };
+
+        setProfileData(newProfileData);
+        setInitialProfileData(newProfileData);
+
+        // Load privacy settings from backend
+        setPrivacySettings({
+          showEmail: data.show_email || false,
+          showPhone: data.show_phone || false,
+          showLocation: data.show_location || false,
+          showUniversity: data.show_university || false,
+          showBio: data.show_bio || false
+        });
+      } catch (error) {
+        console.error('Failed to load profile:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadProfile();
+  }, []);
 
   const [passwordData, setPasswordData] = useState({
     currentPassword: '',
@@ -26,42 +93,15 @@ export default function SettingsPage() {
     confirmPassword: ''
   });
 
-  const [notificationSettings, setNotificationSettings] = useState({
-    emailNotifications: true,
-    pushNotifications: true,
-    sessionReminders: true,
-    newMessages: true,
-    groupInvitations: true,
-    achievements: true,
-    weeklySummary: false,
-    resourceUploads: true,
-    votingUpdates: true
-  });
-
   const [privacySettings, setPrivacySettings] = useState({
-    profileVisibility: 'everyone',
     showEmail: false,
     showPhone: false,
-    showStatistics: true,
-    showActivity: true,
-    allowMessages: true
-  });
-
-  const [appearanceSettings, setAppearanceSettings] = useState({
-    theme: 'light',
-    language: 'english',
-    fontSize: 'medium',
-    compactMode: false
+    showLocation: false,
+    showUniversity: false,
+    showBio: false
   });
 
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
-
-  const toggleNotification = (key) => {
-    setNotificationSettings({
-      ...notificationSettings,
-      [key]: !notificationSettings[key]
-    });
-  };
 
   const togglePrivacy = (key) => {
     setPrivacySettings({
@@ -70,9 +110,94 @@ export default function SettingsPage() {
     });
   };
 
-  const handleSave = () => {
-    setSaved(true);
-    setTimeout(() => setSaved(false), 3000);
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const token = localStorage.getItem('sb_token');
+      if (!token) {
+        alert('Please log in first');
+        return;
+      }
+
+      // Send all user fields and privacy settings to backend
+      await updateProfile({
+        username: profileData.name,
+        phone: profileData.phone,
+        location: profileData.location,
+        university: profileData.university,
+        major: profileData.major,
+        bio: profileData.bio,
+        show_email: privacySettings.showEmail,
+        show_phone: privacySettings.showPhone,
+        show_location: privacySettings.showLocation,
+        show_university: privacySettings.showUniversity,
+        show_bio: privacySettings.showBio
+      });
+
+      setInitialProfileData(profileData);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    } catch (error) {
+      console.error('Failed to save profile:', error);
+      alert('Failed to save profile. Please try again.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handlePasswordChange = async () => {
+    setSavingPassword(true);
+    try {
+      const token = localStorage.getItem('sb_token');
+      if (!token) {
+        alert('Please log in first');
+        return;
+      }
+
+      // Validate passwords
+      if (!passwordData.currentPassword || !passwordData.newPassword || !passwordData.confirmPassword) {
+        alert('Please fill in all password fields');
+        setSavingPassword(false);
+        return;
+      }
+
+      if (passwordData.newPassword !== passwordData.confirmPassword) {
+        alert('New passwords do not match');
+        setSavingPassword(false);
+        return;
+      }
+
+      if (passwordData.newPassword.length < 6) {
+        alert('New password must be at least 6 characters long');
+        setSavingPassword(false);
+        return;
+      }
+
+      // Call the password change API
+      await changePassword(passwordData.currentPassword, passwordData.newPassword);
+
+      // Reset password fields
+      setPasswordData({
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: ''
+      });
+
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+      alert('Password changed successfully!');
+    } catch (error) {
+      console.error('Failed to change password:', error);
+      if (error.message && error.message.includes('Current password is incorrect')) {
+        alert('Current password is incorrect. Please try again.');
+      } else if (error.message && error.message.includes('must be different')) {
+        alert('New password must be different from current password');
+      } else {
+        alert('Failed to change password. Please try again.');
+      }
+    } finally {
+      setSavingPassword(false);
+    }
   };
 
   const handleBack = () => {
@@ -83,7 +208,6 @@ export default function SettingsPage() {
     { id: 'profile', name: 'Profile', icon: User, color: 'from-blue-500 to-cyan-500' },
     { id: 'account', name: 'Account', icon: Mail, color: 'from-purple-500 to-pink-500' },
     { id: 'security', name: 'Security', icon: Lock, color: 'from-green-500 to-emerald-500' },
-    { id: 'notifications', name: 'Notifications', icon: Bell, color: 'from-orange-500 to-red-500' },
     { id: 'privacy', name: 'Privacy', icon: Shield, color: 'from-indigo-500 to-blue-500' },
     { id: 'appearance', name: 'Appearance', icon: Palette, color: 'from-pink-500 to-rose-500' }
   ];
@@ -104,23 +228,23 @@ export default function SettingsPage() {
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+    <div className={`min-h-screen transition-colors duration-300 ${theme === 'dark' ? 'bg-gray-950' : 'bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50'}`}>
       {/* Header */}
-      <div className="bg-white/90 backdrop-blur-lg border-b border-gray-200/50 sticky top-0 z-50 shadow-sm">
+      <div className={`${theme === 'dark' ? 'bg-gray-900 border-gray-800' : 'bg-white/90'} backdrop-blur-lg border-b ${theme === 'dark' ? 'border-gray-800/50' : 'border-gray-200/50'} sticky top-0 z-50 shadow-sm`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-20">
             <div className="flex items-center space-x-4">
               <button 
                 onClick={handleBack}
-                className="p-2.5 hover:bg-gray-100 rounded-xl transition-all hover:scale-105"
+                className={`p-2.5 rounded-xl transition-all hover:scale-105 ${theme === 'dark' ? 'hover:bg-gray-800 text-gray-300' : 'hover:bg-gray-100 text-gray-600'}`}
               >
-                <ArrowLeft className="w-5 h-5 text-gray-600" />
+                <ArrowLeft className="w-5 h-5" />
               </button>
               <div>
                 <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">
                   Settings
                 </h1>
-                <p className="text-sm text-gray-500 mt-0.5">Customize your experience</p>
+                <p className={`text-sm mt-0.5 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>Customize your experience</p>
               </div>
             </div>
             {saved && (
@@ -138,7 +262,7 @@ export default function SettingsPage() {
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
           {/* Sidebar Navigation */}
           <div className="lg:col-span-1">
-            <div className="bg-white/90 backdrop-blur-lg rounded-3xl border border-gray-200/50 p-3 sticky top-28 shadow-xl">
+            <div className={`${theme === 'dark' ? 'bg-gray-800/90 border-gray-700/50' : 'bg-white/90 border-gray-200/50'} backdrop-blur-lg rounded-3xl border p-3 sticky top-28 shadow-xl`}>
               <nav className="space-y-2">
                 {sections.map((section) => {
                   const Icon = section.icon;
@@ -150,10 +274,10 @@ export default function SettingsPage() {
                       className={`w-full flex items-center space-x-3 px-4 py-4 rounded-2xl transition-all duration-300 ${
                         isActive
                           ? `bg-gradient-to-r ${section.color} text-white shadow-lg scale-105`
-                          : 'text-gray-700 hover:bg-gray-100'
+                          : theme === 'dark' ? 'text-gray-200 hover:bg-gray-700' : 'text-gray-700 hover:bg-gray-100'
                       }`}
                     >
-                      <div className={`p-2 rounded-xl ${isActive ? 'bg-white/20' : 'bg-gray-100'} transition-colors`}>
+                      <div className={`p-2 rounded-xl ${isActive ? 'bg-white/20' : theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'} transition-colors`}>
                         <Icon className="w-5 h-5" />
                       </div>
                       <span className="font-semibold text-sm">{section.name}</span>
@@ -173,32 +297,40 @@ export default function SettingsPage() {
                 <div className="bg-gradient-to-br from-blue-500 to-cyan-500 rounded-3xl p-8 text-white shadow-2xl">
                   <div className="flex items-center space-x-6">
                     <div className="relative">
-                      <div className="w-28 h-28 bg-white/20 backdrop-blur-lg rounded-3xl flex items-center justify-center border-4 border-white/30 shadow-xl">
-                        <span className="text-white text-4xl font-bold">JD</span>
+                      <div className="w-28 h-28 bg-white/20 backdrop-blur-lg rounded-3xl flex items-center justify-center border-4 border-white/30 shadow-xl overflow-hidden">
+                        {profileData.photoUrl ? (
+                          <img src={profileData.photoUrl} alt="Profile" className="w-full h-full object-cover" />
+                        ) : (
+                          <span className="text-white text-4xl font-bold">{profileData.name.charAt(0).toUpperCase()}</span>
+                        )}
                       </div>
                       <button className="absolute -bottom-2 -right-2 w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-lg hover:scale-110 transition-transform">
                         <Camera className="w-5 h-5 text-blue-600" />
                       </button>
                     </div>
                     <div>
-                      <h2 className="text-3xl font-bold mb-1">{profileData.name}</h2>
-                      <p className="text-blue-100 mb-3">{profileData.email}</p>
+                      <h2 className="text-3xl font-bold mb-1">{profileData.name || 'User'}</h2>
+                      <p className="text-blue-100 mb-3">{profileData.email || 'No email'}</p>
                       <div className="flex items-center space-x-4 text-sm">
-                        <span className="flex items-center space-x-1 bg-white/20 px-3 py-1 rounded-full">
-                          <MapPin className="w-4 h-4" />
-                          <span>{profileData.location}</span>
-                        </span>
-                        <span className="flex items-center space-x-1 bg-white/20 px-3 py-1 rounded-full">
-                          <Briefcase className="w-4 h-4" />
-                          <span>{profileData.university}</span>
-                        </span>
+                        {profileData.location && (
+                          <span className="flex items-center space-x-1 bg-white/20 px-3 py-1 rounded-full">
+                            <MapPin className="w-4 h-4" />
+                            <span>{profileData.location}</span>
+                          </span>
+                        )}
+                        {profileData.university && (
+                          <span className="flex items-center space-x-1 bg-white/20 px-3 py-1 rounded-full">
+                            <Briefcase className="w-4 h-4" />
+                            <span>{profileData.university}</span>
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
                 </div>
 
-                <div className="bg-white/90 backdrop-blur-lg rounded-3xl border border-gray-200/50 p-8 shadow-xl">
-                  <h3 className="text-2xl font-bold text-gray-900 mb-6 flex items-center space-x-2">
+                <div className={`${getThemeClass('bg-white/90 border-gray-200/50', 'bg-gray-800/90 border-gray-700/50')} backdrop-blur-lg rounded-3xl border p-8 shadow-xl`}>
+                  <h3 className={`text-2xl font-bold mb-6 flex items-center space-x-2 ${getThemeClass('text-gray-900', 'text-white')}`}>
                     <User className="w-6 h-6 text-blue-600" />
                     <span>Personal Information</span>
                   </h3>
@@ -274,10 +406,11 @@ export default function SettingsPage() {
                   <div className="mt-8 flex justify-end">
                     <button 
                       onClick={handleSave}
-                      className="bg-gradient-to-r from-blue-600 to-cyan-600 text-white px-8 py-3.5 rounded-2xl font-semibold hover:shadow-2xl transition-all hover:scale-105 flex items-center space-x-2"
+                      disabled={saving}
+                      className="bg-gradient-to-r from-blue-600 to-cyan-600 text-white px-8 py-3.5 rounded-2xl font-semibold hover:shadow-2xl transition-all hover:scale-105 flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <Save className="w-5 h-5" />
-                      <span>Save Changes</span>
+                      <span>{saving ? 'Saving...' : 'Save Changes'}</span>
                     </button>
                   </div>
                 </div>
@@ -287,8 +420,8 @@ export default function SettingsPage() {
             {/* Account Section */}
             {activeSection === 'account' && (
               <div className="space-y-6">
-                <div className="bg-white/90 backdrop-blur-lg rounded-3xl border border-gray-200/50 p-8 shadow-xl">
-                  <h3 className="text-2xl font-bold text-gray-900 mb-6 flex items-center space-x-2">
+                <div className={`${getThemeClass('bg-white/90 border-gray-200/50', 'bg-gray-800/90 border-gray-700/50')} backdrop-blur-lg rounded-3xl border p-8 shadow-xl`}>
+                  <h3 className={`text-2xl font-bold mb-6 flex items-center space-x-2 ${getThemeClass('text-gray-900', 'text-white')}`}>
                     <Mail className="w-6 h-6 text-purple-600" />
                     <span>Account Settings</span>
                   </h3>
@@ -401,8 +534,8 @@ export default function SettingsPage() {
             {/* Security Section */}
             {activeSection === 'security' && (
               <div className="space-y-6">
-                <div className="bg-white/90 backdrop-blur-lg rounded-3xl border border-gray-200/50 p-8 shadow-xl">
-                  <h3 className="text-2xl font-bold text-gray-900 mb-6 flex items-center space-x-2">
+                <div className={`${getThemeClass('bg-white/90 border-gray-200/50', 'bg-gray-800/90 border-gray-700/50')} backdrop-blur-lg rounded-3xl border p-8 shadow-xl`}>
+                  <h3 className={`text-2xl font-bold mb-6 flex items-center space-x-2 ${getThemeClass('text-gray-900', 'text-white')}`}>
                     <Lock className="w-6 h-6 text-green-600" />
                     <span>Security Settings</span>
                   </h3>
@@ -500,45 +633,12 @@ export default function SettingsPage() {
 
                   <div className="mt-8 flex justify-end">
                     <button 
-                      onClick={handleSave}
-                      className="bg-gradient-to-r from-green-600 to-emerald-600 text-white px-8 py-3.5 rounded-2xl font-semibold hover:shadow-2xl transition-all hover:scale-105 flex items-center space-x-2"
+                      onClick={handlePasswordChange}
+                      disabled={savingPassword}
+                      className="bg-gradient-to-r from-green-600 to-emerald-600 text-white px-8 py-3.5 rounded-2xl font-semibold hover:shadow-2xl transition-all hover:scale-105 flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <Save className="w-5 h-5" />
-                      <span>Save Changes</span>
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Notifications Section */}
-            {activeSection === 'notifications' && (
-              <div className="space-y-6">
-                <div className="bg-white/90 backdrop-blur-lg rounded-3xl border border-gray-200/50 p-8 shadow-xl">
-                  <h3 className="text-2xl font-bold text-gray-900 mb-6 flex items-center space-x-2">
-                    <Bell className="w-6 h-6 text-orange-600" />
-                    <span>Notification Settings</span>
-                  </h3>
-                  
-                  <div className="space-y-4">
-                    {Object.entries(notificationSettings).map(([key, value]) => (
-                      <div key={key} className="flex items-center justify-between p-5 border-2 border-gray-200 rounded-2xl hover:border-gray-300 transition-colors">
-                        <div>
-                          <p className="font-semibold text-gray-900 capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}</p>
-                          <p className="text-sm text-gray-600 mt-1">Manage {key.replace(/([A-Z])/g, ' $1').toLowerCase()} notifications</p>
-                        </div>
-                        <ToggleSwitch checked={value} onChange={() => toggleNotification(key)} />
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="mt-8 flex justify-end">
-                    <button 
-                      onClick={handleSave}
-                      className="bg-gradient-to-r from-orange-600 to-red-600 text-white px-8 py-3.5 rounded-2xl font-semibold hover:shadow-2xl transition-all hover:scale-105 flex items-center space-x-2"
-                    >
-                      <Save className="w-5 h-5" />
-                      <span>Save Preferences</span>
+                      <span>{savingPassword ? 'Updating...' : 'Save Changes'}</span>
                     </button>
                   </div>
                 </div>
@@ -548,27 +648,14 @@ export default function SettingsPage() {
             {/* Privacy Section */}
             {activeSection === 'privacy' && (
               <div className="space-y-6">
-                <div className="bg-white/90 backdrop-blur-lg rounded-3xl border border-gray-200/50 p-8 shadow-xl">
-                  <h3 className="text-2xl font-bold text-gray-900 mb-6 flex items-center space-x-2">
+                <div className={`${getThemeClass('bg-white/90 border-gray-200/50', 'bg-gray-800/90 border-gray-700/50')} backdrop-blur-lg rounded-3xl border p-8 shadow-xl`}>
+                  <h3 className={`text-2xl font-bold mb-6 flex items-center space-x-2 ${getThemeClass('text-gray-900', 'text-white')}`}>
                     <Shield className="w-6 h-6 text-indigo-600" />
                     <span>Privacy Settings</span>
                   </h3>
                   
                   <div className="space-y-6">
-                    <div className="space-y-2">
-                      <label className="text-sm font-semibold text-gray-700">Profile Visibility</label>
-                      <select 
-                        value={privacySettings.profileVisibility}
-                        onChange={(e) => setPrivacySettings({...privacySettings, profileVisibility: e.target.value})}
-                        className="w-full px-4 py-3.5 rounded-2xl border-2 border-gray-200 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all"
-                      >
-                        <option value="everyone">Everyone</option>
-                        <option value="groups">Groups Only</option>
-                        <option value="private">Private</option>
-                      </select>
-                    </div>
-
-                    <div className="pt-4 border-t border-gray-200 space-y-4">
+                    <div className="space-y-4">
                       {Object.entries(privacySettings).filter(([key]) => key !== 'profileVisibility').map(([key, value]) => (
                         <div key={key} className="flex items-center justify-between">
                           <p className="text-gray-900 font-medium capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}</p>
@@ -594,8 +681,8 @@ export default function SettingsPage() {
             {/* Appearance Section */}
             {activeSection === 'appearance' && (
               <div className="space-y-6">
-                <div className="bg-white/90 backdrop-blur-lg rounded-3xl border border-gray-200/50 p-8 shadow-xl">
-                  <h3 className="text-2xl font-bold text-gray-900 mb-6 flex items-center space-x-2">
+                <div className={`${getThemeClass('bg-white/90 border-gray-200/50', 'bg-gray-800/90 border-gray-700/50')} backdrop-blur-lg rounded-3xl border p-8 shadow-xl`}>
+                  <h3 className={`text-2xl font-bold mb-6 flex items-center space-x-2 ${getThemeClass('text-gray-900', 'text-white')}`}>
                     <Palette className="w-6 h-6 text-pink-600" />
                     <span>Appearance Settings</span>
                   </h3>
@@ -604,8 +691,10 @@ export default function SettingsPage() {
                     <div className="space-y-2">
                       <label className="text-sm font-semibold text-gray-700">Theme</label>
                       <select 
-                        value={appearanceSettings.theme}
-                        onChange={(e) => setAppearanceSettings({...appearanceSettings, theme: e.target.value})}
+                        value={theme}
+                        onChange={(e) => {
+                          setTheme(e.target.value);
+                        }}
                         className="w-full px-4 py-3.5 rounded-2xl border-2 border-gray-200 focus:border-pink-500 focus:ring-4 focus:ring-pink-500/10 transition-all"
                       >
                         <option value="light">Light</option>
@@ -615,34 +704,16 @@ export default function SettingsPage() {
                     </div>
 
                     <div className="space-y-2">
-                      <label className="text-sm font-semibold text-gray-700">Language</label>
-                      <select 
-                        value={appearanceSettings.language}
-                        onChange={(e) => setAppearanceSettings({...appearanceSettings, language: e.target.value})}
-                        className="w-full px-4 py-3.5 rounded-2xl border-2 border-gray-200 focus:border-pink-500 focus:ring-4 focus:ring-pink-500/10 transition-all"
-                      >
-                        <option value="english">English</option>
-                        <option value="spanish">Spanish</option>
-                        <option value="french">French</option>
-                      </select>
-                    </div>
-
-                    <div className="space-y-2">
                       <label className="text-sm font-semibold text-gray-700">Font Size</label>
                       <select 
-                        value={appearanceSettings.fontSize}
-                        onChange={(e) => setAppearanceSettings({...appearanceSettings, fontSize: e.target.value})}
+                        value={fontSize}
+                        onChange={(e) => setFontSize(e.target.value)}
                         className="w-full px-4 py-3.5 rounded-2xl border-2 border-gray-200 focus:border-pink-500 focus:ring-4 focus:ring-pink-500/10 transition-all"
                       >
                         <option value="small">Small</option>
                         <option value="medium">Medium</option>
                         <option value="large">Large</option>
                       </select>
-                    </div>
-
-                    <div className="flex items-center justify-between p-5 border-2 border-gray-200 rounded-2xl">
-                      <p className="text-gray-900 font-medium">Compact Mode</p>
-                      <ToggleSwitch checked={appearanceSettings.compactMode} onChange={() => setAppearanceSettings({...appearanceSettings, compactMode: !appearanceSettings.compactMode})} />
                     </div>
                   </div>
 

@@ -63,10 +63,21 @@ func main() {
 			content = parts[1]
 		}
 
+		// Fetch sender name
+		var senderName string
+		err := db.DB.QueryRow(`SELECT username FROM users WHERE id=$1`, msg.UserID).Scan(&senderName)
+		if err != nil || senderName == "" {
+			_ = db.DB.QueryRow(`SELECT email FROM users WHERE id=$1`, msg.UserID).Scan(&senderName)
+		}
+		if senderName == "" {
+			senderName = "User"
+		}
+
 		return db.SaveMessage(db.DB, models.Message{
-			GroupID:  msg.GroupID,
-			SenderID: msg.UserID,
-			Content:  content,
+			GroupID:   msg.GroupID,
+			SenderID:  msg.UserID,
+			SenderName: senderName,
+			Content:   content,
 		})
 	}
 

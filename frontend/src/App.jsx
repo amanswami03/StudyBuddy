@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, createContext, useContext } from 'react';
 import HomePage from './HomePage';
 import Auth from './Auth';
 import MainDashboard from './MainDashboard';
@@ -7,6 +7,12 @@ import GroupDetail from './GroupDetail';
 import Calendar from './Calendar';
 import UserProfile from './UserProfile';
 import SettingsPage from './SettingsPage';
+import { ThemeProvider } from './contexts/ThemeContext';
+
+// Create context for online/offline status
+export const ConnectionContext = createContext({ isOnline: true });
+
+export const useConnection = () => useContext(ConnectionContext);
 
 function AppRoutes() {
   const navigate = useNavigate();
@@ -204,9 +210,28 @@ function AppRoutes() {
 }
 
 export default function App() {
+  const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
+
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
   return (
     <BrowserRouter>
-      <AppRoutes />
+      <ConnectionContext.Provider value={{ isOnline }}>
+        <ThemeProvider>
+          <AppRoutes />
+        </ThemeProvider>
+      </ConnectionContext.Provider>
     </BrowserRouter>
   );
 }
