@@ -13,7 +13,13 @@ import (
 var DB *sql.DB
 
 func Init() {
-	connStr := "postgres://postgres:1234@localhost:5432/studybuddy?sslmode=disable"
+	connStr := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=%s",
+		os.Getenv("DB_USER"),
+		os.Getenv("DB_PASSWORD"),
+		os.Getenv("DB_HOST"),
+		os.Getenv("DB_PORT"),
+		os.Getenv("DB_NAME"),
+		os.Getenv("DB_SSLMODE"))
 	var err error
 	DB, err = sql.Open("postgres", connStr)
 	if err != nil {
@@ -32,6 +38,7 @@ func Init() {
 func runMigrations() {
 	// List of migration files in order
 	migrations := []string{
+		"migrates.sql",
 		"migrations_groups_create.sql",
 		"migrate_messages.sql",
 		"migrate_groups.sql",
@@ -48,7 +55,7 @@ func runMigrations() {
 	}
 
 	// Get the correct migration path
-	migrationsPath := "/Users/amanswami/Desktop/StudyBuddy/backend/internal/db"
+	migrationsPath := filepath.Join("internal", "db")
 
 	for _, migration := range migrations {
 		filePath := filepath.Join(migrationsPath, migration)

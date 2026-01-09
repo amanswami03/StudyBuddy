@@ -60,6 +60,9 @@ export const apiCall = async (endpoint, options = {}) => {
 // Get current user profile
 export const getProfile = () => apiCall('/api/profile');
 
+// Get a specific user's public profile by ID
+export const getUserProfile = (userId) => apiCall(`/api/users/${userId}`);
+
 // Update user profile
 export const updateProfile = (profileData) => 
   apiCall('/api/profile', {
@@ -241,8 +244,14 @@ export const login = (email, password) =>
 // Get user stats (points, rank, progress)
 export const getUserStats = () => apiCall('/api/user/stats');
 
+// Get user stats for a specific user (public)
+export const getUserStatsPublic = (userId) => apiCall(`/api/users/${userId}/stats`);
+
 // Get user activity stats (study hours, sessions, resources)
 export const getUserActivityStats = () => apiCall('/api/user/activity');
+
+// Get user activity stats for a specific user (public)
+export const getUserActivityStatsPublic = (userId) => apiCall(`/api/users/${userId}/activity`);
 
 // Get leaderboard
 export const getLeaderboard = () => apiCall('/api/leaderboard');

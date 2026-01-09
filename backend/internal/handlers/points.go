@@ -6,6 +6,8 @@ import (
 	"strconv"
 
 	"studybuddy/internal/db"
+
+	"github.com/gorilla/mux"
 )
 
 // GetUserStats returns user's points, rank, and leaderboard position
@@ -232,6 +234,135 @@ func GetUserActivityStats(w http.ResponseWriter, r *http.Request) {
 	userID, err := GetUserIDFromRequest(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	// Count scheduled group sessions the user is attending
+	var sessionsAttended int
+	err = db.DB.QueryRow(`
+		SELECT COUNT(*) FROM scheduled_group_sessions sgs
+		INNER JOIN group_members gm ON gm.group_id = sgs.group_id
+		WHERE gm.user_id = $1 AND sgs.start_time <= NOW()
+	`, userID).Scan(&sessionsAttended)
+	if err != nil {
+		sessionsAttended = 0
+	}
+
+	// Count groups user is member of
+	var groupsJoined int
+	err = db.DB.QueryRow(`
+		SELECT COUNT(*) FROM group_members WHERE user_id = $1
+	`, userID).Scan(&groupsJoined)
+	if err != nil {
+		groupsJoined = 0
+	}
+
+	// Calculate study hours from actual study sessions (real time spent)
+	var studyHours int
+	err = db.DB.QueryRow(`
+		SELECT COALESCE(SUM(duration_minutes) / 60, 0) FROM study_sessions 
+		WHERE user_id = $1 AND is_active = false AND end_time IS NOT NULL
+	`, userID).Scan(&studyHours)
+	if err != nil {
+		studyHours = 0
+	}
+
+	// Count actual files shared by user (message_type = 'file')
+	var resourcesShared int
+	err = db.DB.QueryRow(`
+		SELECT COUNT(*) FROM messages WHERE sender_id = $1 AND message_type = 'file'
+	`, userID).Scan(&resourcesShared)
+	if err != nil {
+		resourcesShared = 0
+	}
+
+	// Get login streak from user_ranks
+	var loginStreak int
+	err = db.DB.QueryRow(`
+		SELECT COALESCE(login_streak, 0) FROM user_ranks WHERE user_id = $1
+	`, userID).Scan(&loginStreak)
+	if err != nil {
+		loginStreak = 0
+	}
+
+	response := map[string]interface{}{
+		"user_id":           userID,
+		"study_hours":       studyHours,
+		"sessions_attended": sessionsAttended,
+		"groups_joined":     groupsJoined,
+		"resources_shared":  resourcesShared,
+		"login_streak":      loginStreak,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}
+
+// GetUserStatsPublic returns a user's public stats by ID
+func GetUserStatsPublic(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	userIDStr := vars["id"]
+	userID, err := strconv.Atoi(userIDStr)
+	if err != nil {
+		http.Error(w, "Invalid user ID", http.StatusBadRequest)
+		return
+	}
+
+	// Get user rank info
+	rank, err := db.GetUserRank(userID)
+	if err != nil {
+		http.Error(w, "Failed to get rank", http.StatusInternalServerError)
+		return
+	}
+
+	// Get rank thresholds
+	thresholds, err := db.GetRankThresholds()
+	if err != nil {
+		http.Error(w, "Failed to get rank thresholds", http.StatusInternalServerError)
+		return
+	}
+
+	// Calculate progress to next rank
+	var currentRankPoints, nextRankPoints int
+	for _, t := range thresholds {
+		if t.RankName == rank.CurrentRank {
+			currentRankPoints = t.PointsNeeded
+		}
+		if t.PointsNeeded > rank.TotalPoints {
+			nextRankPoints = t.PointsNeeded
+			break
+		}
+	}
+
+	progressToNext := 0
+	pointsForNext := nextRankPoints - rank.TotalPoints
+	if pointsForNext > 0 {
+		progressToNext = int(float64(rank.TotalPoints-currentRankPoints) / float64(nextRankPoints-currentRankPoints) * 100)
+		if progressToNext > 100 {
+			progressToNext = 100
+		}
+	}
+
+	response := map[string]interface{}{
+		"user_id":          rank.UserID,
+		"total_points":     rank.TotalPoints,
+		"current_rank":     rank.CurrentRank,
+		"login_streak":     rank.LoginStreak,
+		"progress_to_next": progressToNext,
+		"points_to_next":   pointsForNext,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}
+
+// GetUserActivityStatsPublic returns public user activity stats by ID
+func GetUserActivityStatsPublic(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	userIDStr := vars["id"]
+	userID, err := strconv.Atoi(userIDStr)
+	if err != nil {
+		http.Error(w, "Invalid user ID", http.StatusBadRequest)
 		return
 	}
 

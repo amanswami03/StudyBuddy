@@ -38,18 +38,6 @@ const HomePage = () => {
       title: 'Intelligent Scheduling',
       description: 'Collaborative time-finding with voting system. Seamlessly syncs with Google Calendar.',
       color: 'from-purple-500 to-pink-500'
-    },
-    {
-      icon: <MessageSquare className="w-6 h-6" />,
-      title: 'Real-time Collaboration',
-      description: 'Built-in chat, video calls, and whiteboard for effective group study sessions.',
-      color: 'from-orange-500 to-red-500'
-    },
-    {
-      icon: <Award className="w-6 h-6" />,
-      title: 'Gamified Learning',
-      description: 'Track progress, earn achievements, and stay motivated with streak counters and leaderboards.',
-      color: 'from-green-500 to-teal-500'
     }
   ];
 
@@ -159,10 +147,6 @@ const HomePage = () => {
                 Start Learning Free
                 <ArrowRight className="w-5 h-5" />
               </Link>
-              <button className="border-2 border-slate-700 px-8 py-4 rounded-xl hover:border-slate-500 transition-all flex items-center gap-2 text-lg font-semibold">
-                <Play className="w-5 h-5" />
-                Watch Demo
-              </button>
             </div>
 
             {/* Stats */}
@@ -284,58 +268,6 @@ const HomePage = () => {
         </div>
       </section>
 
-      {/* Pricing */}
-      <section id="pricing" className="py-20 px-6">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl md:text-5xl font-bold mb-4">Simple Pricing</h2>
-            <p className="text-xl text-slate-400">Choose the plan that fits your needs</p>
-          </div>
-
-          <div className="grid md:grid-cols-3 gap-8">
-            {pricingPlans.map((plan, index) => (
-              <div
-                key={index}
-                className={`relative bg-slate-900/50 border rounded-2xl p-8 ${
-                  plan.popular
-                    ? 'border-blue-500 shadow-xl shadow-blue-500/20'
-                    : 'border-slate-800'
-                }`}
-              >
-                {plan.popular && (
-                  <div className="absolute -top-4 left-1/2 transform -translate-x-1/2 bg-gradient-to-r from-blue-600 to-purple-600 px-4 py-1 rounded-full text-sm font-semibold">
-                    Most Popular
-                  </div>
-                )}
-                <h3 className="text-2xl font-bold mb-2">{plan.name}</h3>
-                <div className="mb-6">
-                  <span className="text-5xl font-bold">{plan.price}</span>
-                  <span className="text-slate-400">/month</span>
-                </div>
-                <ul className="space-y-3 mb-8">
-                  {plan.features.map((feature, i) => (
-                    <li key={i} className="flex items-center gap-2">
-                      <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0" />
-                      <span className="text-slate-300">{feature}</span>
-                    </li>
-                  ))}
-                </ul>
-                <Link
-                  to="/auth?mode=signup"
-                  className={`w-full inline-block text-center py-3 rounded-lg font-semibold transition-all ${
-                    plan.popular
-                      ? 'bg-gradient-to-r from-blue-600 to-purple-600 hover:shadow-lg hover:shadow-blue-500/50'
-                      : 'bg-slate-800 hover:bg-slate-700'
-                  }`}
-                >
-                  Get Started
-                </Link>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
       {/* CTA Section */}
       <section className="py-20 px-6">
         <div className="max-w-4xl mx-auto text-center">
@@ -346,10 +278,10 @@ const HomePage = () => {
             <p className="text-xl mb-8 text-blue-100">
               Join thousands of students who are already studying smarter
             </p>
-            <button className="bg-white text-blue-600 px-8 py-4 rounded-xl hover:shadow-2xl transition-all text-lg font-semibold">
+            <Link to="/auth?mode=signup" className="inline-block bg-white text-blue-600 px-8 py-4 rounded-xl hover:shadow-2xl transition-all text-lg font-semibold">
               Start Free Today
               <ArrowRight className="inline w-5 h-5 ml-2" />
-            </button>
+            </Link>
           </div>
         </div>
       </section>

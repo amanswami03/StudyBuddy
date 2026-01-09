@@ -19,7 +19,12 @@ func RegisterRoutes(r *mux.Router) {
 	r.HandleFunc("/api/profile/password", handlers.ChangePassword).Methods("PUT")
 	r.HandleFunc("/api/profile/delete", handlers.DeleteAccount).Methods("DELETE")
 	r.HandleFunc("/api/user/profile-photo", handlers.UploadProfilePhoto).Methods("POST")
-	r.HandleFunc("/api/users/{id:[0-9]+}", handlers.GetPublicProfile).Methods("GET")
+	
+	// User routes - use subrouter to avoid conflicts
+	userRouter := r.PathPrefix("/api/users").Subrouter()
+	userRouter.HandleFunc("/{id:[0-9]+}/stats", handlers.GetUserStatsPublic).Methods("GET")
+	userRouter.HandleFunc("/{id:[0-9]+}/activity", handlers.GetUserActivityStatsPublic).Methods("GET")
+	userRouter.HandleFunc("/{id:[0-9]+}", handlers.GetPublicProfile).Methods("GET")
 
 	r.HandleFunc("/api/groups/{id:[0-9]+}/messages", handlers.GetGroupMessages).Methods("GET")
 	r.HandleFunc("/api/groups/{id:[0-9]+}/messages", handlers.PostGroupMessage).Methods("POST")

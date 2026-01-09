@@ -4,6 +4,7 @@ import { ArrowLeft, Users, Calendar, FileText, Video, Settings, Send, Paperclip,
 import { getGroupMessages, postGroupMessage, getGroup, getGroupMembers, removeGroupMember, makeGroupAdmin, removeGroupAdmin, leaveGroup, updateGroup, canViewGroupContent, getGroupSessions, joinGroupSession, voteForSessionTime, getGroupResources, uploadGroupResource, deleteGroupResource, getGroupJoinRequests, approveJoinRequest, rejectJoinRequest, joinGroup } from './utils/api';
 import ScheduleSessionModal from './components/ScheduleSessionModal';
 import DeleteGroupModal from './components/DeleteGroupModal';
+import UserProfileModal from './components/UserProfileModal';
 
 // Get API base URL for file access
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080';
@@ -17,6 +18,8 @@ export default function GroupDetail() {
   const [showSearchModal, setShowSearchModal] = useState(false);
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showUserProfileModal, setShowUserProfileModal] = useState(false);
+  const [selectedUserId, setSelectedUserId] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [canViewContent, setCanViewContent] = useState(false);
@@ -761,6 +764,14 @@ export default function GroupDetail() {
                     // isMe strictly checks senderID equality
                     const isMe = typeof msg.senderID === 'number' && msg.senderID === currentUserID;
                     const avatar = (senderName || 'U').split(' ').map(s => s[0]).slice(0,2).join('').toUpperCase();
+                    
+                    const handleSenderClick = () => {
+                      if (!isMe && msg.senderID) {
+                        setSelectedUserId(msg.senderID);
+                        setShowUserProfileModal(true);
+                      }
+                    };
+                    
                     // content may be JSON for files
                     let content = msg.content || msg.message || '';
                     let fileMeta = null;
@@ -784,14 +795,23 @@ export default function GroupDetail() {
                         <div className={`flex gap-2 max-w-[70%] ${isMe ? 'flex-row-reverse' : 'flex-row'}`}>
                           {!isMe && (
                             <div className="flex-shrink-0">
-                              <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center">
+                              <button
+                                onClick={handleSenderClick}
+                                disabled={isMe}
+                                className={`w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center ${!isMe ? 'cursor-pointer hover:shadow-lg hover:scale-110 transition-all' : ''}`}
+                              >
                                 <span className="text-white text-xs font-semibold">{avatar}</span>
-                              </div>
+                              </button>
                             </div>
                           )}
                           <div className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
                             {!isMe && (
-                              <span className="text-xs font-medium text-gray-700 mb-1 px-3">{senderName}</span>
+                              <button
+                                onClick={handleSenderClick}
+                                className={`text-xs font-medium text-gray-700 mb-1 px-3 ${!isMe ? 'cursor-pointer hover:text-blue-600 hover:underline transition-colors' : ''}`}
+                              >
+                                {senderName}
+                              </button>
                             )}
                             <div className={`rounded-2xl px-4 py-2 shadow-sm ${
                               isMe
@@ -1679,6 +1699,16 @@ export default function GroupDetail() {
           }}
         />
       )}
+
+      {/* User Profile Modal */}
+      <UserProfileModal
+        userId={selectedUserId}
+        isOpen={showUserProfileModal}
+        onClose={() => {
+          setShowUserProfileModal(false);
+          setSelectedUserId(null);
+        }}
+      />
     </div>
   );
 }

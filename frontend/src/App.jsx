@@ -201,6 +201,7 @@ function AppRoutes() {
         <Route path="/dashboard" element={<MainDashboard />} />
         <Route path="/calendar" element={<Calendar />} />
         <Route path="/profile" element={<UserProfile />} />
+        <Route path="/profile/:userId" element={<UserProfile />} />
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="/group/:id" element={<GroupDetail />} />
         <Route path="*" element={<HomePage />} />

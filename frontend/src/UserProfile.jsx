@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Camera, Edit, Mail, Award, BookOpen, Users, Clock, TrendingUp, Settings, Bell, Lock, User, Save, Search, X, Phone, MapPin } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
-import { getProfile, updateProfile, getUserStats, getRankThresholds, getUserActivityStats, getMyGroups, listGroups, searchGroups, joinGroup } from './utils/api';
+import { useNavigate, useParams } from 'react-router-dom';
+import { getProfile, getUserProfile, updateProfile, getUserStats, getRankThresholds, getUserActivityStats, getMyGroups, listGroups, searchGroups, joinGroup, getUserStatsPublic, getUserActivityStatsPublic } from './utils/api';
 import { useTheme } from './contexts/ThemeContext';
 
 // Get API base URL for photo access
@@ -9,7 +9,19 @@ const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080';
 
 export default function UserProfile() {
   const navigate = useNavigate();
+  const params = useParams();
   const { theme } = useTheme();
+
+  // Determine if we're viewing another user's profile based on URL parameter
+  // If params.userId exists, we're viewing someone else's profile
+  // If no params.userId, we're viewing our own profile
+  const isViewingOther = useMemo(() => {
+    return !!params.userId;
+  }, [params.userId]);
+
+  const viewingUserId = useMemo(() => {
+    return params.userId ? parseInt(params.userId, 10) : null;
+  }, [params.userId]);
 
   // Helper function for theme-aware classes
   const getThemeClass = (lightClass, darkClass) => {
@@ -52,10 +64,16 @@ export default function UserProfile() {
         let profileData, statsData, activityData, ranksData;
         
         try {
+          // Load the appropriate profile data
+          const profilePromise = isViewingOther 
+            ? getUserProfile(viewingUserId) 
+            : getProfile();
+          
           const results = await Promise.all([
-            getProfile(),
-            getUserStats(),
-            getUserActivityStats(),
+            profilePromise,
+            // Load stats based on whether viewing own profile or other
+            isViewingOther ? getUserStatsPublic(viewingUserId) : getUserStats(),
+            isViewingOther ? getUserActivityStatsPublic(viewingUserId) : getUserActivityStats(),
             getRankThresholds()
           ]);
           profileData = results[0];
@@ -96,6 +114,11 @@ export default function UserProfile() {
         const userName = profileData?.username || profileData?.email || localStorage.getItem('sb_username') || 'User Profile';
         const userEmail = profileData?.email || localStorage.getItem('sb_email') || 'Email not available';
         
+        // Ensure user ID is in localStorage
+        if (profileData?.id) {
+          localStorage.setItem('sb_user_id', String(profileData.id));
+        }
+        
         // Convert profile_pic to absolute URL if it's relative
         let photoUrl = profileData?.profile_pic || null;
         if (photoUrl && !photoUrl.startsWith('http')) {
@@ -106,6 +129,7 @@ export default function UserProfile() {
         console.log('Profile Data received:', profileData);
         console.log('localStorage username:', localStorage.getItem('sb_username'));
         console.log('Using name:', userName, 'email:', userEmail, 'photo:', photoUrl);
+        console.log('API User ID:', profileData?.id, 'show_bio flag:', profileData?.show_bio);
         
         setUser({
           name: userName,
@@ -179,7 +203,7 @@ export default function UserProfile() {
     };
 
     loadUserData();
-  }, []);
+  }, [isViewingOther, viewingUserId]);
 
   // Load user's groups and discover groups
   useEffect(() => {
@@ -435,11 +459,11 @@ export default function UserProfile() {
                   accept="image/*"
                   style={{ display: 'none' }}
                   onChange={handlePhotoUpload}
-                  disabled={uploading}
+                  disabled={uploading || isViewingOther}
                 />
                 <button
                   onClick={() => fileInputRef.current?.click()}
-                  disabled={uploading}
+                  disabled={uploading || isViewingOther}
                   className="absolute bottom-2 right-2 w-8 h-8 bg-white rounded-full flex items-center justify-center shadow-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Camera className="w-4 h-4 text-gray-600" />
@@ -453,23 +477,26 @@ export default function UserProfile() {
                     <h1 className="text-2xl font-bold text-gray-900">{user.name}</h1>
                     {user.showEmail && <p className="text-gray-600">{user.email}</p>}
                   </div>
-                  <button
-                    onClick={() => setIsEditing(!isEditing)}
-                    className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors flex items-center space-x-2"
-                  >
-                    <Edit className="w-4 h-4" />
-                    <span>{isEditing ? 'Save' : 'Edit Profile'}</span>
-                  </button>
-                  <button
-                    onClick={() => navigate('/settings')}
-                    className="bg-gray-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-gray-700 transition-colors flex items-center space-x-2"
-                  >
-                    <Settings className="w-4 h-4" />
-                    <span>Settings</span>
-                  </button>
+                  {!isViewingOther && (
+                    <>
+                      <button
+                        onClick={() => setIsEditing(!isEditing)}
+                        className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors flex items-center space-x-2"
+                      >
+                        <Edit className="w-4 h-4" />
+                        <span>{isEditing ? 'Save' : 'Edit Profile'}</span>
+                      </button>
+                      <button
+                        onClick={() => navigate('/settings')}
+                        className="bg-gray-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-gray-700 transition-colors flex items-center space-x-2"
+                      >
+                        <Settings className="w-4 h-4" />
+                        <span>Settings</span>
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
-            </div>
 
             {/* Tabs */}
             <div className="flex space-x-8 mt-6 border-b border-gray-200">
@@ -518,7 +545,7 @@ export default function UserProfile() {
               <div className={`${getThemeClass('bg-white border-gray-200', 'bg-gray-800 border-gray-700')} rounded-xl p-6 border`}>
                 <div className="flex items-center justify-between mb-4">
                   <h2 className={`text-lg font-semibold ${getThemeClass('text-gray-900', 'text-white')}`}>About</h2>
-                  {!isEditingBio && (
+                  {!isEditingBio && !isViewingOther && (
                     <button
                       onClick={() => {
                         setIsEditingBio(true);
@@ -558,7 +585,7 @@ export default function UserProfile() {
                     </div>
                   </div>
                 ) : (
-                  <p className="text-gray-700 whitespace-pre-wrap">{user.showBio ? (user.bio || 'No bio available') : 'Bio is private'}</p>
+                  <p className="text-gray-700 whitespace-pre-wrap">{!isViewingOther || user.showBio ? (user.bio || 'No bio available') : 'Bio is private'}</p>
                 )}
               </div>
 
@@ -566,7 +593,7 @@ export default function UserProfile() {
               <div className={`${getThemeClass('bg-white border-gray-200', 'bg-gray-800 border-gray-700')} rounded-xl p-6 border`}>
                 <h2 className={`text-lg font-semibold ${getThemeClass('text-gray-900', 'text-white')} mb-4`}>Contact Information</h2>
                 <div className="space-y-3">
-                  {user.showEmail && (
+                  {(!isViewingOther || user.showEmail) && user.email && (
                     <div className="flex items-center gap-3">
                       <Mail className="w-5 h-5 text-blue-600" />
                       <div>
@@ -575,7 +602,7 @@ export default function UserProfile() {
                       </div>
                     </div>
                   )}
-                  {user.showPhone && (
+                  {(!isViewingOther || user.showPhone) && user.phone && (
                     <div className="flex items-center gap-3">
                       <Phone className="w-5 h-5 text-green-600" />
                       <div>
@@ -584,7 +611,7 @@ export default function UserProfile() {
                       </div>
                     </div>
                   )}
-                  {user.showLocation && (
+                  {(!isViewingOther || user.showLocation) && user.location && (
                     <div className="flex items-center gap-3">
                       <MapPin className="w-5 h-5 text-red-600" />
                       <div>
@@ -593,7 +620,7 @@ export default function UserProfile() {
                       </div>
                     </div>
                   )}
-                  {user.showUniversity && (
+                  {(!isViewingOther || user.showUniversity) && user.university && (
                     <div className="flex items-center gap-3">
                       <BookOpen className="w-5 h-5 text-purple-600" />
                       <div>
@@ -602,7 +629,7 @@ export default function UserProfile() {
                       </div>
                     </div>
                   )}
-                  {!user.showEmail && !user.showPhone && !user.showLocation && !user.showUniversity && (
+                  {isViewingOther && !user.showEmail && !user.showPhone && !user.showLocation && !user.showUniversity && (
                     <p className={`${getThemeClass('text-gray-500', 'text-gray-400')} text-sm italic`}>User has made contact information private</p>
                   )}
                 </div>
@@ -654,73 +681,77 @@ export default function UserProfile() {
                   )}
                 </div>
 
-                {/* My Groups */}
-                {groupsLoading ? (
-                  <p className="text-gray-600">Loading groups...</p>
-                ) : myGroups.length > 0 ? (
-                  <div className="space-y-3">
-                    {myGroups.map(group => (
-                      <div
-                        key={group.id}
-                        onClick={() => navigate(`/group/${group.id}`)}
-                        className="flex items-center justify-between p-4 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors cursor-pointer"
-                      >
-                        <div className="flex items-center space-x-3">
-                          <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-lg flex items-center justify-center">
-                            <BookOpen className="w-5 h-5 text-white" />
-                          </div>
-                          <div>
-                            <p className="font-medium text-gray-900">{group.name}</p>
-                            <p className="text-sm text-gray-600">{group.members} members</p>
-                          </div>
-                        </div>
-                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                          group.role === 'Admin'
-                            ? 'bg-purple-100 text-purple-700'
-                            : 'bg-blue-100 text-blue-700'
-                        }`}>
-                          {group.role}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-8">
-                    <Users className="w-12 h-12 text-gray-300 mx-auto mb-2" />
-                    <p className="text-gray-600">You haven't joined any groups yet</p>
-                    <p className="text-sm text-gray-500">Search above to discover and join groups</p>
-                  </div>
-                )}
-
-                {/* Discover Groups */}
-                {discoverGroups.length > 0 && (
-                  <div className="mt-6 pt-6 border-t border-gray-200">
-                    <h3 className="font-semibold text-gray-900 mb-3">Discover Groups</h3>
-                    <div className="space-y-3">
-                      {discoverGroups.map(group => (
-                        <div
-                          key={group.id}
-                          className="flex items-center justify-between p-4 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
-                        >
-                          <div className="flex items-center space-x-3">
-                            <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-red-500 rounded-lg flex items-center justify-center">
-                              <BookOpen className="w-5 h-5 text-white" />
-                            </div>
-                            <div>
-                              <p className="font-medium text-gray-900">{group.name}</p>
-                              <p className="text-sm text-gray-600">{group.members} members</p>
-                            </div>
-                          </div>
-                          <button
-                            onClick={() => handleJoinGroup(group.id)}
-                            className="text-blue-600 hover:text-blue-700 font-medium text-sm"
+                {/* My Groups - Only show when viewing own profile */}
+                {!isViewingOther && (
+                  <>
+                    {groupsLoading ? (
+                      <p className="text-gray-600">Loading groups...</p>
+                    ) : myGroups.length > 0 ? (
+                      <div className="space-y-3">
+                        {myGroups.map(group => (
+                          <div
+                            key={group.id}
+                            onClick={() => navigate(`/group/${group.id}`)}
+                            className="flex items-center justify-between p-4 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors cursor-pointer"
                           >
-                            Join →
-                          </button>
+                            <div className="flex items-center space-x-3">
+                              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-lg flex items-center justify-center">
+                                <BookOpen className="w-5 h-5 text-white" />
+                              </div>
+                              <div>
+                                <p className="font-medium text-gray-900">{group.name}</p>
+                                <p className="text-sm text-gray-600">{group.members} members</p>
+                              </div>
+                            </div>
+                            <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                              group.role === 'Admin'
+                                ? 'bg-purple-100 text-purple-700'
+                                : 'bg-blue-100 text-blue-700'
+                            }`}>
+                              {group.role}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-8">
+                        <Users className="w-12 h-12 text-gray-300 mx-auto mb-2" />
+                        <p className="text-gray-600">You haven't joined any groups yet</p>
+                        <p className="text-sm text-gray-500">Search above to discover and join groups</p>
+                      </div>
+                    )}
+
+                    {/* Discover Groups */}
+                    {discoverGroups.length > 0 && (
+                      <div className="mt-6 pt-6 border-t border-gray-200">
+                        <h3 className="font-semibold text-gray-900 mb-3">Discover Groups</h3>
+                        <div className="space-y-3">
+                          {discoverGroups.map(group => (
+                            <div
+                              key={group.id}
+                              className="flex items-center justify-between p-4 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
+                            >
+                              <div className="flex items-center space-x-3">
+                                <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-red-500 rounded-lg flex items-center justify-center">
+                                  <BookOpen className="w-5 h-5 text-white" />
+                                </div>
+                                <div>
+                                  <p className="font-medium text-gray-900">{group.name}</p>
+                                  <p className="text-sm text-gray-600">{group.members} members</p>
+                                </div>
+                              </div>
+                              <button
+                                onClick={() => handleJoinGroup(group.id)}
+                                className="text-blue-600 hover:text-blue-700 font-medium text-sm"
+                              >
+                                Join →
+                              </button>
+                            </div>
+                          ))}
                         </div>
-                      ))}
-                    </div>
-                  </div>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             </div>
@@ -919,6 +950,7 @@ export default function UserProfile() {
             </div>
           </div>
         )}
+      </div>
       </div>
     </div>
   );

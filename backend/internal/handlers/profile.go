@@ -87,34 +87,40 @@ func GetPublicProfile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Check if the requesting user is viewing their own profile
+	authUserID, _ := GetUserIDFromRequest(r)
+	isOwnProfile := authUserID == userID
+
 	var user models.User
-	var showEmail, showPhone, showLocation, showUniversity, showBio bool
 	
 	err = db.DB.QueryRow(`
 		SELECT id, username, email, profile_pic, bio, last_seen, is_online, show_last_seen, show_online, phone, created_at, show_email, show_phone, show_location, show_university, show_bio
 		FROM users WHERE id=$1`, userID).Scan(
 		&user.ID, &user.Username, &user.Email, &user.ProfilePic, &user.Bio, &user.LastSeen,
-		&user.IsOnline, &user.ShowLastSeen, &user.ShowOnline, &user.Phone, &user.CreatedAt, &showEmail, &showPhone, &showLocation, &showUniversity, &showBio)
+		&user.IsOnline, &user.ShowLastSeen, &user.ShowOnline, &user.Phone, &user.CreatedAt, &user.ShowEmail, &user.ShowPhone, &user.ShowLocation, &user.ShowUniversity, &user.ShowBio)
 	if err != nil {
 		http.Error(w, "User not found", http.StatusNotFound)
 		return
 	}
 
-	// Apply privacy settings
-	if !showEmail {
-		user.Email = ""
-	}
-	if !showPhone {
-		user.Phone = nil
-	}
-	if !showLocation {
-		user.Location = nil
-	}
-	if !showUniversity {
-		user.University = nil
-	}
-	if !showBio {
-		user.Bio = nil
+	// Apply privacy settings only for other users' profiles
+	// Users can always see their own complete profile
+	if !isOwnProfile {
+		if !user.ShowEmail {
+			user.Email = ""
+		}
+		if !user.ShowPhone {
+			user.Phone = nil
+		}
+		if !user.ShowLocation {
+			user.Location = nil
+		}
+		if !user.ShowUniversity {
+			user.University = nil
+		}
+		if !user.ShowBio {
+			user.Bio = nil
+		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")
