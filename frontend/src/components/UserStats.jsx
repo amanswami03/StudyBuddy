@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { Award, TrendingUp, Zap, Trophy, Clock } from 'lucide-react';
 
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+
 export default function UserStats() {
   const [stats, setStats] = useState(null);
   const [rankThresholds, setRankThresholds] = useState([]);
@@ -11,8 +13,8 @@ export default function UserStats() {
     const fetchStats = async () => {
       try {
         const [statsRes, ranksRes] = await Promise.all([
-          fetch('http://localhost:8080/api/user/stats'),
-          fetch('http://localhost:8080/api/ranks')
+          fetch(`${API_BASE}/api/user/stats`),
+          fetch(`${API_BASE}/api/ranks`)
         ]);
 
         if (!statsRes.ok || !ranksRes.ok) {

@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { Trophy, Zap, TrendingUp } from 'lucide-react';
 
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+
 export default function Leaderboard() {
   const [leaderboard, setLeaderboard] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -9,7 +11,7 @@ export default function Leaderboard() {
   useEffect(() => {
     const fetchLeaderboard = async () => {
       try {
-        const response = await fetch('http://localhost:8080/api/leaderboard?limit=50');
+        const response = await fetch(`${API_BASE}/api/leaderboard?limit=50`);
         if (!response.ok) {
           throw new Error('Failed to fetch leaderboard');
         }
