@@ -12,7 +12,7 @@ StudyBuddy is a full-stack application designed to help students find study part
 - **Real-time Messaging**: WebSocket-based chat for group communication
 - **User Profiles**: Customize profiles with bios and personal information
 - **Study Sessions**: Track and schedule study sessions with timers
-- **Gamification**: Points system and leaderboards to encourage participation
+- **Gamification**: Points system to encourage participation
 - **Notifications**: Real-time notifications for group activities and events
 - **Resource Sharing**: Share study resources and materials with groups
 - **Privacy Settings**: Control your profile visibility and group access

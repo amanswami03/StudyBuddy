@@ -12,14 +12,22 @@ import (
 
 var DB *sql.DB
 
+func getEnvWithDefault(key, defaultValue string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
+	}
+	return defaultValue
+}
+
 func Init() {
+	user := getEnvWithDefault("DB_USER", "postgres")
+	password := getEnvWithDefault("DB_PASSWORD", "postgres")
+	host := getEnvWithDefault("DB_HOST", "localhost")
+	port := getEnvWithDefault("DB_PORT", "5432")
+	name := getEnvWithDefault("DB_NAME", "studybuddy")
+	sslmode := getEnvWithDefault("DB_SSLMODE", "disable")
 	connStr := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=%s",
-		os.Getenv("DB_USER"),
-		os.Getenv("DB_PASSWORD"),
-		os.Getenv("DB_HOST"),
-		os.Getenv("DB_PORT"),
-		os.Getenv("DB_NAME"),
-		os.Getenv("DB_SSLMODE"))
+		user, password, host, port, name, sslmode)
 	var err error
 	DB, err = sql.Open("postgres", connStr)
 	if err != nil {

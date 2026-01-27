@@ -217,10 +217,35 @@ export default function App() {
     const handleOnline = () => setIsOnline(true);
     const handleOffline = () => setIsOnline(false);
 
+    // Check backend connectivity periodically
+    const checkBackendHealth = async () => {
+      try {
+        const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+        const response = await fetch(`${API_BASE}/health`, {
+          method: 'GET',
+          signal: AbortSignal.timeout(3000) // 3 second timeout
+        });
+        if (response.ok) {
+          setIsOnline(true);
+        }
+      } catch (error) {
+        // If backend is unreachable, mark as offline
+        if (navigator.onLine) {
+          setIsOnline(false);
+        }
+      }
+    };
+
+    // Check backend health every 5 seconds
+    const healthCheckInterval = setInterval(checkBackendHealth, 5000);
+    // Initial check
+    checkBackendHealth();
+
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
 
     return () => {
+      clearInterval(healthCheckInterval);
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
