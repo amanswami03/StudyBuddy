@@ -48,6 +48,37 @@ export default function StudyTimer({ onSessionEnd }) {
     }
   }, [isOnline, isRunning, sessionId]);
 
+  // Handle page unload - end session when user closes tab/site
+  useEffect(() => {
+    const handleBeforeUnload = (event) => {
+      if (sessionId && isRunning) {
+        // Attempt to end the session before closing
+        try {
+          const token = localStorage.getItem('sb_token');
+          const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+          
+          // Use fetch with keepalive flag for reliable delivery even when page is unloading
+          fetch(`${apiUrl}/api/study/end?session_id=${sessionId}`, {
+            method: 'POST',
+            keepalive: true,
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({}),
+          }).catch(error => {
+            console.error('Failed to end session on page unload:', error);
+          });
+        } catch (error) {
+          console.error('Error during page unload:', error);
+        }
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [sessionId, isRunning]);
+
   // Timer effect
   useEffect(() => {
     let interval;
