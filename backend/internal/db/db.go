@@ -12,26 +12,51 @@ import (
 
 var DB *sql.DB
 
-func getEnvWithDefault(key, defaultValue string) string {
-	if value := os.Getenv(key); value != "" {
-		return value
-	}
-	return defaultValue
-}
-
 func Init() {
-	user := getEnvWithDefault("DB_USER", "postgres")
-	password := getEnvWithDefault("DB_PASSWORD", "postgres")
-	host := getEnvWithDefault("DB_HOST", "localhost")
-	port := getEnvWithDefault("DB_PORT", "5432")
-	name := getEnvWithDefault("DB_NAME", "studybuddy")
-	sslmode := getEnvWithDefault("DB_SSLMODE", "disable")
-	connStr := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=%s",
-		user, password, host, port, name, sslmode)
+	// Use DATABASE_URL if available (Render/production), otherwise fall back to individual env vars (development)
+	var connStr string
+	
+	if databaseURL := os.Getenv("DATABASE_URL"); databaseURL != "" {
+		// Production: Use DATABASE_URL directly
+		connStr = databaseURL
+		// Add sslmode=require for Render if not already present
+		if !contains(connStr, "sslmode") {
+			connStr += "?sslmode=require"
+		}
+	} else {
+		// Development: Use individual environment variables
+		user := os.Getenv("DB_USER")
+		if user == "" {
+			user = "postgres"
+		}
+		password := os.Getenv("DB_PASSWORD")
+		if password == "" {
+			password = "postgres"
+		}
+		host := os.Getenv("DB_HOST")
+		if host == "" {
+			host = "localhost"
+		}
+		port := os.Getenv("DB_PORT")
+		if port == "" {
+			port = "5432"
+		}
+		name := os.Getenv("DB_NAME")
+		if name == "" {
+			name = "studybuddy"
+		}
+		sslmode := os.Getenv("DB_SSLMODE")
+		if sslmode == "" {
+			sslmode = "disable"
+		}
+		connStr = fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=%s",
+			user, password, host, port, name, sslmode)
+	}
+	
 	var err error
 	DB, err = sql.Open("postgres", connStr)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("Failed to open database:", err)
 	}
 
 	if err = DB.Ping(); err != nil {
@@ -41,6 +66,15 @@ func Init() {
 
 	// Run migrations
 	runMigrations()
+}
+
+func contains(s, substr string) bool {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
 }
 
 func runMigrations() {

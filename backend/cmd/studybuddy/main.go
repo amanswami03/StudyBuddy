@@ -83,6 +83,12 @@ func main() {
 
 	handler := c.Handler(r)
 
-	fmt.Println("Server started on :8080")
-	http.ListenAndServe(":8080", handler)
+	// Listen on dynamic PORT (set by Render) or default to 8080
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+	addr := "0.0.0.0:" + port
+	fmt.Printf("🚀 Server started on %s\n", addr)
+	http.ListenAndServe(addr, handler)
 }
