@@ -38,9 +38,14 @@ func main() {
 
 	// Enable CORS
 	c := cors.New(cors.Options{
-		// allow both common vite dev ports (5173 and 5174) during development and Docker frontend
-		AllowedOrigins: []string{"http://localhost:5173", "http://localhost:5174", "http://localhost:3000", "http://frontend:3000"},
-		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowedOrigins: []string{
+			"http://localhost:5173", 
+			"http://localhost:5174", 
+			"http://localhost:3000", 
+			"http://frontend:3000",
+			"*", // Allow all origins for development/testing
+		},
+		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"},
 		AllowedHeaders:   []string{"*"},
 		AllowCredentials: true,
 	})
