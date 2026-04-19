@@ -1,1 +1,4 @@
-.envnode_modules/
+.env
+.env.local
+backend/.env
+node_modules/
