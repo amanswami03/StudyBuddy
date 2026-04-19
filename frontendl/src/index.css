@@ -1,0 +1,212 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─── Reset ─────────────────────────────────────────────────────── */
+html, body, #root { margin: 0; padding: 0; width: 100%; height: auto; }
+*, *::before, *::after { box-sizing: border-box; }
+html, body { max-width: 100vw; overscroll-behavior-x: none; }
+nav, .max-w-7xl, .mx-auto, .absolute.inset-0 { max-width: 100vw; box-sizing: border-box; }
+.overflow-hidden-safe { overflow-x: hidden !important; }
+
+/* ─── Study Design System Tokens ────────────────────────────────── */
+:root {
+  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-size-multiplier: 1;
+
+  /* Parchment / paper surface */
+  --page-bg:        #fef8ec;
+  --page-bg-alt:    #f9f3e3;
+  --card-bg:        #ffffff;
+  --card-border:    #e5d9b8;
+
+  /* Ink palette */
+  --ink-900:  #1a1f4e;
+  --ink-700:  #1e3a8a;
+  --ink-500:  #2563eb;
+  --ink-300:  #93c5fd;
+  --ink-100:  #dbeafe;
+
+  /* Amber / warm rule lines */
+  --rule:       #e8d5a3;
+  --rule-dark:  rgba(255,255,255,0.07);
+
+  /* Subject colours — like coloured notebook tabs */
+  --subj-blue:    #1d4ed8;
+  --subj-green:   #065f46;
+  --subj-red:     #9f1239;
+  --subj-purple:  #6b21a8;
+  --subj-orange:  #c2410c;
+  --subj-teal:    #0e7490;
+  --subj-indigo:  #3730a3;
+  --subj-rose:    #be123c;
+
+  /* Text */
+  --text-primary:   #1a1f4e;
+  --text-secondary: #475569;
+  --text-muted:     #94a3b8;
+}
+
+/* ─── Light mode body ───────────────────────────────────────────── */
+body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+  background-color: var(--page-bg);
+  color: var(--text-primary);
+  min-width: 320px;
+}
+
+/* ─── Dark mode (chalkboard aesthetic) ─────────────────────────── */
+.dark {
+  --page-bg:     #0f172a;
+  --page-bg-alt: #1e293b;
+  --card-bg:     #1e293b;
+  --card-border: #334155;
+  --text-primary:   #f1f5f9;
+  --text-secondary: #94a3b8;
+  --text-muted:     #64748b;
+  background-color: var(--page-bg);
+  color: var(--text-primary);
+}
+.dark input, .dark textarea, .dark select {
+  background-color: #0f172a;
+  color: #f1f5f9;
+  border-color: #334155 !important;
+}
+.dark input:focus, .dark textarea:focus, .dark select:focus {
+  border-color: #60a5fa !important;
+  box-shadow: 0 0 0 3px rgba(96,165,250,0.12);
+}
+
+/* ─── Notebook card ─────────────────────────────────────────────── */
+.notebook-card {
+  background: white;
+  border: 1px solid var(--card-border);
+  border-radius: 12px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06), 0 4px 20px rgba(0,0,0,0.04);
+  position: relative;
+  overflow: hidden;
+}
+.dark .notebook-card {
+  background: var(--card-bg);
+  border-color: var(--card-border);
+}
+
+/* Left accent strip on cards — like a notebook tab colour */
+.notebook-card::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  background: var(--strip-color, #1d4ed8);
+  border-radius: 12px 0 0 12px;
+}
+.notebook-card.no-strip::before { display: none; }
+
+/* ─── Ruled background helper ───────────────────────────────────── */
+.ruled-bg {
+  background-image: repeating-linear-gradient(
+    transparent, transparent 27px,
+    var(--rule) 27px, var(--rule) 28px
+  );
+  background-size: 100% 28px;
+}
+.dark .ruled-bg {
+  background-image: repeating-linear-gradient(
+    transparent, transparent 27px,
+    var(--rule-dark) 27px, var(--rule-dark) 28px
+  );
+}
+
+/* ─── Subject tab pill ──────────────────────────────────────────── */
+.subject-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+/* ─── Pencil underline ──────────────────────────────────────────── */
+.pencil-underline {
+  text-decoration: none;
+  background-image: linear-gradient(to right, #f59e0b 0%, #d97706 100%);
+  background-size: 100% 2px;
+  background-position: 0 100%;
+  background-repeat: no-repeat;
+  padding-bottom: 2px;
+}
+
+/* ─── Highlight (marker) ────────────────────────────────────────── */
+.highlight {
+  background: linear-gradient(120deg, #fef08a 0%, #fde047 100%);
+  padding: 0 3px;
+  border-radius: 3px;
+  color: #1a1f4e;
+}
+.dark .highlight {
+  background: linear-gradient(120deg, rgba(253,224,71,0.25) 0%, rgba(253,224,71,0.15) 100%);
+  color: #fef08a;
+}
+
+/* ─── Page section divider ──────────────────────────────────────── */
+.section-rule {
+  border: none;
+  border-top: 2px solid var(--rule);
+  margin: 2rem 0;
+}
+.dark .section-rule { border-color: #334155; }
+
+/* ─── Timer ring pulse ──────────────────────────────────────────── */
+@keyframes ring-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.6; }
+}
+.ring-pulse { animation: ring-pulse 2s ease-in-out infinite; }
+
+/* ─── Stamp / badge ─────────────────────────────────────────────── */
+.stamp {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 2.5px solid currentColor;
+  border-radius: 8px;
+  padding: 4px 10px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  transform: rotate(-2deg);
+}
+
+/* ─── Route transitions ─────────────────────────────────────────── */
+.route-wrapper {
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 220ms cubic-bezier(.2,.9,.3,1), transform 220ms cubic-bezier(.2,.9,.3,1);
+}
+.route-wrapper.visible { opacity: 1; transform: translateY(0); }
+
+/* ─── Font size controls ────────────────────────────────────────── */
+html.font-small  { --font-size-multiplier: 0.875; font-size: 14px; }
+html.font-medium { --font-size-multiplier: 1;     font-size: 16px; }
+html.font-large  { --font-size-multiplier: 1.125; font-size: 18px; }
+
+/* ─── Scrollbar (subtle) ────────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #d1c9b0; border-radius: 99px; }
+.dark ::-webkit-scrollbar-thumb { background: #334155; }
+
+/* ─── Focus ring ────────────────────────────────────────────────── */
+:focus-visible {
+  outline: 2px solid var(--ink-500);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+

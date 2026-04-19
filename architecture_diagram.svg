@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="900" viewBox="0 0 1400 900">
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="10" refY="5" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L10,5 L0,10 z" fill="#333" />
+    </marker>
+    <style>
+      .box { fill:#f7f9fc; stroke:#2b2f33; stroke-width:1.5px; rx:8; }
+      .title { font: bold 14px sans-serif; fill:#111; }
+      .label { font: 12px sans-serif; fill:#111; }
+      .small { font: 11px sans-serif; fill:#333; }
+      .arrow { stroke:#333; stroke-width:1.6px; fill:none; marker-end:url(#arrow); }
+    </style>
+  </defs>
+
+  <!-- Frontend -->
+  <g>
+    <rect x="60" y="60" width="320" height="160" class="box"/>
+    <text x="220" y="90" text-anchor="middle" class="title">Frontend</text>
+    <text x="220" y="115" text-anchor="middle" class="small">Vite / React (src/)</text>
+    <text x="220" y="135" text-anchor="middle" class="small">Dev ports: 5173 / 3000</text>
+    <text x="220" y="155" text-anchor="middle" class="small">Static assets / API calls</text>
+  </g>
+
+  <!-- HTTP request arrow -->
+  <path d="M380 140 L460 140" class="arrow" />
+  <text x="420" y="128" text-anchor="middle" class="label">HTTP (REST/GraphQL)</text>
+
+  <!-- Reverse proxy / Docker network box -->
+  <g>
+    <rect x="460" y="40" width="420" height="220" fill="#eef3ff" stroke="#2b2f33" rx="10" />
+    <text x="670" y="64" text-anchor="middle" class="title">Backend Service (Docker/Server)</text>
+    <text x="670" y="86" text-anchor="middle" class="small">cmd/studybuddy/main.go</text>
+
+    <!-- API / Router box -->
+    <rect x="520" y="110" width="180" height="90" class="box"/>
+    <text x="610" y="135" text-anchor="middle" class="title">API Router</text>
+    <text x="610" y="155" text-anchor="middle" class="small">github.com/gorilla/mux</text>
+    <text x="610" y="172" text-anchor="middle" class="small">api.RegisterRoutes()</text>
+
+    <!-- Handlers box -->
+    <rect x="730" y="110" width="180" height="90" class="box"/>
+    <text x="820" y="135" text-anchor="middle" class="title">Handlers</text>
+    <text x="820" y="155" text-anchor="middle" class="small">internal/handlers/*.go</text>
+    <text x="820" y="172" text-anchor="middle" class="small">Use `handlers.GlobalHub`</text>
+  </g>
+
+  <!-- DB box -->
+  <g>
+    <rect x="930" y="330" width="260" height="140" class="box"/>
+    <text x="1060" y="360" text-anchor="middle" class="title">Database</text>
+    <text x="1060" y="380" text-anchor="middle" class="small">Postgres (internal/db)</text>
+    <text x="1060" y="400" text-anchor="middle" class="small">migrations: internal/db/*.sql</text>
+  </g>
+
+  <!-- DB arrows -->
+  <path d="M820 200 L1040 330" class="arrow" />
+  <text x="920" y="245" text-anchor="middle" class="label">SQL queries (db.SaveMessage, etc.)</text>
+
+  <!-- WebSocket Hub box -->
+  <g>
+    <rect x="520" y="330" width="380" height="140" class="box"/>
+    <text x="710" y="360" text-anchor="middle" class="title">WebSocket Hub</text>
+    <text x="710" y="380" text-anchor="middle" class="small">internal/ws (hub.go, client.go)</text>
+    <text x="710" y="400" text-anchor="middle" class="small">Route: /ws/{groupID}</text>
+  </g>
+
+  <!-- WS arrow from frontend to hub -->
+  <path d="M220 200 L560 360" class="arrow" />
+  <text x="400" y="240" text-anchor="middle" class="label">WebSocket /ws/{groupID}</text>
+
+  <!-- Hub -> SaveMessageFunc -> DB -->
+  <path d="M720 420 L1040 420" class="arrow" />
+  <text x="880" y="408" text-anchor="middle" class="label">hub.SaveMessageFunc → db.SaveMessage(models.Message)</text>
+
+  <!-- Clients cluster -->
+  <g>
+    <circle cx="470" cy="430" r="8" fill="#fff" stroke="#2b2f33"/>
+    <circle cx="490" cy="450" r="8" fill="#fff" stroke="#2b2f33"/>
+    <circle cx="450" cy="450" r="8" fill="#fff" stroke="#2b2f33"/>
+    <text x="480" y="472" text-anchor="middle" class="small">WebSocket clients (users)</text>
+  </g>
+
+  <path d="M550 380 L530 440" class="arrow" />
+
+  <!-- Uploads / Static files -->
+  <g>
+    <rect x="60" y="260" width="320" height="120" class="box"/>
+    <text x="220" y="290" text-anchor="middle" class="title">Uploads</text>
+    <text x="220" y="312" text-anchor="middle" class="small">./uploads/ served at /uploads/</text>
+    <text x="220" y="330" text-anchor="middle" class="small">Used by frontend and handlers</text>
+  </g>
+
+  <path d="M580 220 L420 300" class="arrow" />
+  <text x="500" y="240" text-anchor="middle" class="label">FileServer stripPrefix("/uploads/")</text>
+
+  <!-- CORS -->
+  <g>
+    <rect x="460" y="280" width="420" height="40" rx="8" fill="#fff3e6" stroke="#2b2f33" />
+    <text x="670" y="305" text-anchor="middle" class="small">CORS middleware (rs/cors) — AllowedOrigins, Methods, Headers</text>
+  </g>
+
+  <!-- Docker / Compose -->
+  <g>
+    <rect x="60" y="420" width="320" height="120" class="box"/>
+    <text x="220" y="450" text-anchor="middle" class="title">Deployment / Containers</text>
+    <text x="220" y="472" text-anchor="middle" class="small">docker-compose.yml, Dockerfile (frontend/backend)</text>
+    <text x="220" y="492" text-anchor="middle" class="small">Ports: backend 8080, frontend 3000</text>
+  </g>
+
+  <path d="M220 380 L220 420" class="arrow" />
+  <text x="240" y="400" class="small">API & WS traffic</text>
+
+  <!-- Legend / Notes -->
+  <g>
+    <rect x="1020" y="20" width="360" height="120" rx="6" fill="#ffffff" stroke="#2b2f33"/>
+    <text x="1200" y="42" text-anchor="middle" class="title">Legend & Key Flows</text>
+    <text x="1080" y="66" class="small">- Frontend → Backend: HTTP (REST) and WebSocket</text>
+    <text x="1080" y="86" class="small">- Backend uses router: api.RegisterRoutes()</text>
+    <text x="1080" y="106" class="small">- Handlers access DB via internal/db and broadcast via GlobalHub</text>
+  </g>
+
+  <!-- Footer: main.go reference -->
+  <text x="700" y="860" text-anchor="middle" class="small">Server entry: [backend/cmd/studybuddy/main.go](backend/cmd/studybuddy/main.go#L1-L200)</text>
+</svg>
