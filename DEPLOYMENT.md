@@ -32,23 +32,47 @@ postgresql://studybuddydb_6b7k_user:drbIRJxeyobmj1Yg2k1H1YUf25k9sUZI@dpg-d7ihubv
 
 **Important**: The `sslmode=require` parameter will be added automatically by the code.
 
-### 2. Frontend Service - Environment Variables
+### 2. Frontend Service - Deploy to Netlify
 
-Go to your **Frontend Service** in Render and add:
+Your frontend is now ready to deploy to Netlify. It already has:
+- ✅ `netlify.toml` configuration file
+- ✅ `.env.production` with backend API URL
 
-**Variable Name**: `VITE_API_URL`
+---
 
-**Value**: (Replace with your actual backend service URL)
+## Deploy Frontend to Netlify
+
+### Step-by-Step:
+
+1. **Sign up/Login to Netlify**: https://netlify.com
+
+2. **Connect your GitHub repository**:
+   - Click "New site from Git"
+   - Select "GitHub"
+   - Choose your `StudyBuddy` repository
+   - Branch: `main`
+
+3. **Configure Build Settings**:
+   - **Build command**: `npm run build`
+   - **Publish directory**: `dist`
+   - **Base directory**: `frontendl`
+
+4. **Deploy**:
+   - Netlify will automatically build and deploy
+   - Your frontend URL will be displayed (e.g., `https://your-studybuddy.netlify.app`)
+
+### Backend API Configuration
+
+The frontend is already configured to use:
 ```
-https://your-backend-service-name.onrender.com
+VITE_API_URL=https://studybuddy-1-sr8z.onrender.com
 ```
 
-### 3. Deploy
+This is set in `frontendl/.env.production`
 
-After setting the environment variables:
-1. Click **Deploy** on both services
-2. Monitor the deployment logs
-3. Check if the database connection succeeds (look for ✅ Connected to DB)
+If you change the backend URL in the future, update:
+1. `frontendl/.env.production` 
+2. Redeploy to Netlify
 
 ---
 

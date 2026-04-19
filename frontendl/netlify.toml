@@ -1,0 +1,12 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+[env]
+  [env.production]
+    VITE_API_URL = "https://studybuddy-1-sr8z.onrender.com"
