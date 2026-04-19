@@ -36,27 +36,13 @@ func main() {
 		ws.ServeWS(hub, w, r)
 	})
 
-	// Enable CORS with support for environment variable override
-	allowedOrigins := []string{
-		"http://localhost:5173", 
-		"http://localhost:5174", 
-		"http://localhost:3000", 
-		"http://frontend:3000",
-		"https://studybuddyam.netlify.app",    // Main production frontend
-		"https://*-studybuddy.netlify.app",    // Preview deployments
-	}
-	
-	// Allow override from environment variable for flexibility
-	if frontendURL := os.Getenv("FRONTEND_URL"); frontendURL != "" {
-		allowedOrigins = append(allowedOrigins, frontendURL)
-	}
-	
+	// Enable CORS with permissive settings for cross-origin requests
 	c := cors.New(cors.Options{
-		AllowedOrigins:   allowedOrigins,
+		AllowedOrigins: []string{"*"}, // Allow all origins (can restrict later)
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"},
 		AllowedHeaders:   []string{"*"},
 		ExposedHeaders:   []string{"Content-Length", "Content-Type", "Authorization"},
-		AllowCredentials: true,
+		AllowCredentials: false, // Must be false when using "*"
 		MaxAge:           300,
 	})
 
