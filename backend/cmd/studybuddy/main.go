@@ -43,11 +43,14 @@ func main() {
 			"http://localhost:5174", 
 			"http://localhost:3000", 
 			"http://frontend:3000",
-			"*", // Allow all origins for development/testing
+			"https://studybuddyapp.netlify.app", // Production frontend on Netlify
+			"https://*.netlify.app", // Any Netlify preview deployment
 		},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"},
 		AllowedHeaders:   []string{"*"},
+		ExposedHeaders:   []string{"Content-Length", "Content-Type", "Authorization"},
 		AllowCredentials: true,
+		MaxAge:           300,
 	})
 
 	hub.SaveMessageFunc = func(msg ws.Message) error {
