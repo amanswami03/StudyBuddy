@@ -408,9 +408,17 @@ export default function GroupDetail() {
     setChatMessages(prev => [...prev, optimistic]);
 
     try {
+      console.log('📤 Sending message:', { groupID: groupIdParam, content: messageContent, clientTempId });
+      
       // PRIMARY: Always save to DB via HTTP (guaranteed persistence)
       const response = await postGroupMessage(groupIdParam, messageContent, clientTempId);
       
+      console.log('✅ Message response from server:', response);
+      
+      if (!response || !response.id) {
+        throw new Error('Invalid response from server: missing message ID');
+      }
+
       // Track this message as processed so WebSocket doesn't duplicate it
       processedMessageIdsRef.current.add(response.id);
       processedMessageIdsRef.current.add(clientTempId);
@@ -431,8 +439,10 @@ export default function GroupDetail() {
             : m
         )
       );
+      
+      console.log('💾 Message persisted to database');
     } catch (error) {
-      console.error('failed to send message', error);
+      console.error('❌ Failed to send message:', error);
       // Mark as failed but keep message visible for user to retry
       setChatMessages(prev =>
         prev.map(m =>
@@ -441,6 +451,7 @@ export default function GroupDetail() {
             : m
         )
       );
+      alert('Failed to send message: ' + error.message);
     }
   };
 

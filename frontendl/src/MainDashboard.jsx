@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getProfile, getGroup, getMyGroups, listGroups, getUserActivityStats, createGroup, searchGroups, joinGroup, getUserNotifications, getUnreadNotificationCount, markNotificationAsRead } from './utils/api';
+import { getProfile, getGroup, getMyGroups, listGroups, getUserActivityStats, createGroup, searchGroups, joinGroup, getUserNotifications, getUnreadNotificationCount, markNotificationAsRead, getSubscriptionStatus } from './utils/api';
 import { Calendar, Users, BookOpen, Bell, Search, Plus, Clock, FileText, Award, ChevronDown, LogOut, Settings, User, TrendingUp, X, Flame, GraduationCap } from 'lucide-react';
 import StudyTimer from './components/StudyTimer';
 import { useTheme } from './contexts/ThemeContext';
@@ -37,6 +37,8 @@ export default function MainDashboard() {
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
   const [myGroups, setMyGroups] = useState([]);
   const [discoverGroups, setDiscoverGroups] = useState([]);
+  const [subscriptionStatus, setSubscriptionStatus] = useState(null);
+  const [maxGroups, setMaxGroups] = useState(3);
 
   const [stats, setStats] = useState([
     { label: 'Study Hours', value: '0h', icon: Clock, color: '#1d4ed8', bg: 'bg-blue-50', text: 'text-blue-700' },
@@ -82,6 +84,31 @@ export default function MainDashboard() {
     fetchNotifications();
     const interval = setInterval(fetchNotifications, 10000);
     return () => { mounted = false; clearInterval(interval); };
+  }, []);
+
+  // Load subscription status
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const token = localStorage.getItem('sb_token');
+        if (!token) return;
+        const status = await getSubscriptionStatus();
+        if (mounted) {
+          setSubscriptionStatus(status);
+          // Set max groups based on subscription tier
+          const tier = status.subscribed ? status.plan_name.toLowerCase() : 'free';
+          const limits = { free: 3, pro: 10, basic: 10, premium: 999999, ultra: 999999 };
+          setMaxGroups(limits[tier] || 3);
+        }
+      } catch (e) {
+        if (mounted) {
+          setSubscriptionStatus(null);
+          setMaxGroups(3); // default to free tier limit
+        }
+      }
+    })();
+    return () => { mounted = false; };
   }, []);
 
   const getTimeAgo = iso => {
@@ -149,6 +176,14 @@ export default function MainDashboard() {
   const handleCreateGroup = async e => {
     e.preventDefault();
     setCreateGroupError('');
+    
+    // Check if user has reached group limit
+    if (myGroups.length >= maxGroups) {
+      const tier = subscriptionStatus?.subscribed ? subscriptionStatus.plan_name : 'Free';
+      setCreateGroupError(`Group limit reached for ${tier} tier (${myGroups.length}/${maxGroups}). Upgrade your subscription to create more groups.`);
+      return;
+    }
+    
     if (!createGroupForm.name.trim()) { setCreateGroupError('Group name is required'); return; }
     if (!createGroupForm.username.trim()) { setCreateGroupError('Group username is required'); return; }
     setCreateGroupLoading(true);
@@ -160,7 +195,15 @@ export default function MainDashboard() {
       setMyGroups(userGroups.map((g, i) => ({ id: g.id, name: g.name, description: g.description || '', members: g.members_count || 0, sessions: 0, resources: 0, nextSession: 'TBD', unreadMessages: 0, role: g.role || 'Member', ...SUBJECT_COLORS[i % SUBJECT_COLORS.length] })));
       navigate(`/group/${result.id}`);
     } catch (error) {
-      setCreateGroupError(error.message || 'Failed to create group');
+      // Check if error is due to group limit
+      if (error.message && error.message.includes('group limit reached')) {
+        const tier = subscriptionStatus?.subscribed ? subscriptionStatus.plan_name : 'Free';
+        setCreateGroupError(`Group limit reached for ${tier} tier (${myGroups.length}/${maxGroups}). Upgrade your subscription to create more groups.`);
+      } else if (error.message && error.message.includes('username already taken')) {
+        setCreateGroupError('This group username is already taken. Please choose another one.');
+      } else {
+        setCreateGroupError(error.message || 'Failed to create group');
+      }
     } finally { setCreateGroupLoading(false); }
   };
 
@@ -168,6 +211,13 @@ export default function MainDashboard() {
 
   const handleJoinGroup = async id => {
     try {
+      // Check if user has reached group join limit
+      if (myGroups.length >= maxGroups) {
+        const tier = subscriptionStatus?.subscribed ? subscriptionStatus.plan_name : 'Free';
+        alert(`Group limit reached for ${tier} tier (${myGroups.length}/${maxGroups}). Upgrade your subscription to join more groups.`);
+        return;
+      }
+      
       const response = await joinGroup(id);
       if (response.status === 'pending') { alert('Your join request has been sent and is pending approval!'); return; }
       const userGroups = await getMyGroups();
@@ -177,7 +227,15 @@ export default function MainDashboard() {
       const joinedIds = new Set(mapped.map(g => g.id));
       setDiscoverGroups(allGroups.filter(g => !joinedIds.has(g.id)).map((g, i) => ({ id: g.id, name: g.name, description: g.description || '', members: g.members_count || 0, ...SUBJECT_COLORS[(i+2) % SUBJECT_COLORS.length] })).slice(0, 6));
       alert('Successfully joined the group!');
-    } catch (error) { alert('Failed to join group: ' + error.message); }
+    } catch (error) {
+      // Check if error is due to group limit
+      if (error.message && error.message.includes('group limit reached')) {
+        const tier = subscriptionStatus?.subscribed ? subscriptionStatus.plan_name : 'Free';
+        alert(`Group limit reached for ${tier} tier (${myGroups.length}/${maxGroups}). Upgrade your subscription to join more groups.`);
+      } else {
+        alert('Failed to join group: ' + error.message);
+      }
+    }
   };
 
   const cardBg = isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-amber-100';
@@ -332,9 +390,18 @@ export default function MainDashboard() {
                   </div>
                 )}
               </div>
-              <button onClick={() => setShowCreateGroupModal(true)}
-                className="bg-blue-700 hover:bg-blue-800 text-white px-5 py-3 rounded-xl text-sm font-semibold shadow-sm hover:shadow transition-all flex items-center gap-2">
-                <Plus className="w-4 h-4" /> Create Group
+              <button 
+                onClick={() => {
+                  if (myGroups.length >= maxGroups) {
+                    const tier = subscriptionStatus?.subscribed ? subscriptionStatus.plan_name : 'Free';
+                    alert(`Group limit reached for ${tier} tier (${myGroups.length}/${maxGroups}). Upgrade your subscription to create more groups.`);
+                  } else {
+                    setShowCreateGroupModal(true);
+                  }
+                }}
+                disabled={myGroups.length >= maxGroups}
+                className={`${myGroups.length >= maxGroups ? 'bg-gray-500 hover:bg-gray-600 cursor-not-allowed opacity-60' : 'bg-blue-700 hover:bg-blue-800'} text-white px-5 py-3 rounded-xl text-sm font-semibold shadow-sm hover:shadow transition-all flex items-center gap-2`}>
+                <Plus className="w-4 h-4" /> {myGroups.length >= maxGroups ? `Group Limit Reached (${myGroups.length}/${maxGroups})` : 'Create Group'}
               </button>
             </div>
 
@@ -417,8 +484,19 @@ export default function MainDashboard() {
                       <span className={`flex items-center gap-1 text-xs ${isDark?'text-slate-500':'text-slate-400'}`}>
                         <Users className="w-3.5 h-3.5" /> {g.members}
                       </span>
-                      <button onClick={() => handleJoinGroup(g.id)}
-                        className="text-xs font-semibold text-blue-600 hover:text-blue-700">Join →</button>
+                      <button 
+                        onClick={() => {
+                          if (myGroups.length >= maxGroups) {
+                            const tier = subscriptionStatus?.subscribed ? subscriptionStatus.plan_name : 'Free';
+                            alert(`Group limit reached for ${tier} tier (${myGroups.length}/${maxGroups}). Upgrade your subscription to join more groups.`);
+                          } else {
+                            handleJoinGroup(g.id);
+                          }
+                        }}
+                        disabled={myGroups.length >= maxGroups}
+                        className={`text-xs font-semibold ${myGroups.length >= maxGroups ? 'text-gray-400 cursor-not-allowed' : 'text-blue-600 hover:text-blue-700'}`}>
+                        {myGroups.length >= maxGroups ? '✗ Limit' : 'Join →'}
+                      </button>
                     </div>
                   </div>
                 ))}

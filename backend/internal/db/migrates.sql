@@ -20,11 +20,3 @@ CREATE TABLE signin_logs (
     user_agent TEXT,
     created_at TIMESTAMP DEFAULT NOW()
 );
-
-CREATE TABLE messages (
-    id SERIAL PRIMARY KEY,
-    group_id TEXT NOT NULL,
-    sender TEXT NOT NULL,
-    content TEXT NOT NULL,
-    created_at TIMESTAMP DEFAULT NOW()
-);

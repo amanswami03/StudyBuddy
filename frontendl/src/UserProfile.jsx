@@ -177,6 +177,87 @@ export default function UserProfile() {
     finally { setUploading(false); if (fileInputRef.current) fileInputRef.current.value = ''; }
   };
 
+  const handlePayment = async (planId, amount, planName) => {
+    const token = localStorage.getItem('sb_token');
+    const userId = localStorage.getItem('sb_user_id');
+    const userName = localStorage.getItem('sb_username');
+    const userEmail = localStorage.getItem('sb_email');
+
+    if (!token || !userId) {
+      alert('Please log in to upgrade');
+      return;
+    }
+
+    try {
+      // Create order on backend
+      const response = await fetch(`${API_BASE}/api/payment/create-order`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          plan_id: planId,
+          amount: amount * 100, // Convert to paise
+          plan_name: planName,
+        }),
+      });
+
+      if (!response.ok) throw new Error('Failed to create order');
+      const orderData = await response.json();
+
+      // Load Razorpay script
+      const script = document.createElement('script');
+      script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+      script.async = true;
+      script.onload = () => {
+        const options = {
+          key: import.meta.env.VITE_RAZORPAY_KEY || '', // Add to .env
+          amount: amount * 100,
+          currency: 'INR',
+          name: 'StudyBuddy',
+          description: `${planName} Plan Subscription`,
+          order_id: orderData.order_id,
+          handler: async (response) => {
+            try {
+              const verifyResponse = await fetch(`${API_BASE}/api/payment/verify`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${token}`,
+                },
+                body: JSON.stringify({
+                  order_id: response.razorpay_order_id,
+                  payment_id: response.razorpay_payment_id,
+                  signature: response.razorpay_signature,
+                }),
+              });
+
+              if (!verifyResponse.ok) throw new Error('Payment verification failed');
+              alert(`✅ Welcome to ${planName}! Payment successful.`);
+              // Refresh user data
+              const refreshedUser = await getProfile();
+              setUser(prev => ({ ...prev, subscription: { plan_id: planId, plan_name: planName } }));
+            } catch (err) {
+              alert(`Payment failed: ${err.message}`);
+            }
+          },
+          prefill: {
+            name: userName,
+            email: userEmail,
+          },
+          theme: { color: '#2563eb' },
+        };
+
+        const rzp = new window.Razorpay(options);
+        rzp.open();
+      };
+      document.body.appendChild(script);
+    } catch (err) {
+      alert(`Error: ${err.message}`);
+    }
+  };
+
   const recentActivity = [
     { id: 1, type: 'session', text: 'Attended Data Structures study session', time: '2 hours ago', icon: Users, color: 'bg-blue-100 text-blue-600' },
     { id: 2, type: 'resource', text: 'Uploaded "Binary Tree Notes.pdf"', time: '5 hours ago', icon: BookOpen, color: 'bg-emerald-100 text-emerald-600' },
@@ -185,13 +266,25 @@ export default function UserProfile() {
     { id: 5, type: 'session', text: 'Hosted React Workshop session', time: '3 days ago', icon: Users, color: 'bg-cyan-100 text-cyan-600' },
   ];
 
-  const badges = [
-    { id: 1, name: 'Study Streak', icon: '🔥', earned: true, date: 'Nov 8, 2025', color: 'border-orange-200 bg-orange-50' },
-    { id: 2, name: 'Team Player', icon: '👥', earned: true, date: 'Nov 5, 2025', color: 'border-blue-200 bg-blue-50' },
-    { id: 3, name: 'Knowledge Sharer', icon: '📚', earned: true, date: 'Nov 3, 2025', color: 'border-emerald-200 bg-emerald-50' },
-    { id: 4, name: 'Early Bird', icon: '🌅', earned: false, progress: '3/5' },
-    { id: 5, name: 'Session Master', icon: '🎯', earned: false, progress: '6/10' },
-    { id: 6, name: 'Quiz Champion', icon: '🏆', earned: false, progress: '4/5' },
+  const premiumPlans = [
+    { 
+      id: 1, 
+      name: 'Pro', 
+      price: 5, 
+      period: 'month', 
+      icon: '⚡',
+      features: ['Up to 10 study groups', '100GB storage', 'Analytics dashboard'],
+      highlighted: false 
+    },
+    { 
+      id: 2, 
+      name: 'Premium', 
+      price: 10, 
+      period: 'month', 
+      icon: '👑',
+      features: ['Everything in Pro', 'Unlimited study groups', 'Unlimited storage'],
+      highlighted: true 
+    },
   ];
 
   const cardBase = `rounded-2xl border ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-amber-100'} shadow-paper`;
@@ -207,7 +300,7 @@ export default function UserProfile() {
 
   if (!user) return null;
 
-  const tabs = ['overview', 'activity', 'badges'];
+  const tabs = ['overview', 'premium'];
 
   return (
     <div className="min-h-screen transition-colors" style={!isDark ? { background: 'var(--page-bg, #fef8ec)' } : { background: '#0f172a' }}>
@@ -497,41 +590,57 @@ export default function UserProfile() {
         )}
 
         {/* Activity tab */}
-        {activeTab === 'activity' && (
-          <div className="max-w-2xl space-y-3">
-            {recentActivity.map(a => (
-              <div key={a.id} className={`${cardBase} p-4 flex items-start gap-3`}>
-                <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${a.color}`}>
-                  <a.icon className="w-4 h-4" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className={`text-sm font-medium ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{a.text}</p>
-                  <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{a.time}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Badges tab */}
-        {activeTab === 'badges' && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {badges.map(b => (
-              <div key={b.id} className={`rounded-2xl p-6 border-2 ${b.earned ? (isDark ? 'border-blue-700 bg-blue-900/20' : b.color || 'border-blue-200 bg-blue-50') : (isDark ? 'border-slate-700 bg-slate-800' : 'border-amber-100 bg-white')}`}>
-                <div className={`text-4xl mb-3 ${!b.earned ? 'grayscale opacity-50' : ''}`}>{b.icon}</div>
-                <h3 className={`font-extrabold text-sm mb-1 ${isDark ? 'text-slate-100' : 'text-slate-800'}`}>{b.name}</h3>
-                {b.earned ? (
-                  <p className="text-xs text-blue-600 font-medium">Earned {b.date}</p>
-                ) : (
-                  <>
-                    <p className={`text-xs mb-2 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Progress: {b.progress}</p>
-                    <div className={`w-full rounded-full h-1.5 ${isDark ? 'bg-slate-700' : 'bg-slate-200'}`}>
-                      <div className="h-full rounded-full bg-slate-400" style={{ width: `${(parseInt(b.progress.split('/')[0]) / parseInt(b.progress.split('/')[1])) * 100}%` }} />
+        {activeTab === 'premium' && (
+          <div className="max-w-4xl">
+            <h2 className={`font-extrabold text-2xl mb-8 ${isDark ? 'text-slate-100' : 'text-slate-800'}`}>Upgrade Your Plan</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {premiumPlans.map(plan => (
+                <div key={plan.id} className={`rounded-2xl border-2 p-8 transition-all ${
+                  plan.highlighted 
+                    ? isDark 
+                      ? 'bg-blue-900/40 border-blue-600 ring-2 ring-blue-500/30' 
+                      : 'bg-blue-50 border-blue-400 ring-2 ring-blue-300/30'
+                    : isDark 
+                      ? 'bg-slate-800 border-slate-700' 
+                      : 'bg-white border-amber-100'
+                }`}>
+                  {plan.highlighted && (
+                    <div className="inline-block px-3 py-1 rounded-full bg-blue-600 text-white text-xs font-bold mb-4">
+                      MOST POPULAR
                     </div>
-                  </>
-                )}
-              </div>
-            ))}
+                  )}
+                  
+                  <div className="text-4xl mb-3">{plan.icon}</div>
+                  <h3 className={`font-extrabold text-2xl mb-2 ${isDark ? 'text-slate-100' : 'text-slate-800'}`}>{plan.name}</h3>
+                  <div className="flex items-baseline gap-1 mb-6">
+                    <span className="text-4xl font-extrabold text-blue-600">₹{plan.price}</span>
+                    <span className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>/{plan.period}</span>
+                  </div>
+
+                  <ul className="space-y-3 mb-8">
+                    {plan.features.map((feature, i) => (
+                      <li key={i} className={`flex items-center gap-2 text-sm ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                        <div className="w-5 h-5 rounded-full bg-blue-600/20 flex items-center justify-center flex-shrink-0">
+                          <span className="w-2 h-2 bg-blue-600 rounded-full" />
+                        </div>
+                        {feature}
+                      </li>
+                    ))}
+                  </ul>
+
+                  <button onClick={() => handlePayment(plan.id, plan.price, plan.name)}
+                    className={`w-full py-3 rounded-xl font-bold text-center transition-all ${
+                      plan.highlighted
+                        ? 'bg-blue-600 text-white hover:bg-blue-700'
+                        : isDark
+                          ? 'bg-slate-700 text-slate-100 hover:bg-slate-600'
+                          : 'bg-slate-100 text-slate-800 hover:bg-slate-200'
+                    }`}>
+                    Get {plan.name}
+                  </button>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>

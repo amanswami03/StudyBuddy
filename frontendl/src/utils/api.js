@@ -462,8 +462,42 @@ export const markNotificationAsRead = (notificationId) =>
 export const getUnreadNotificationCount = () =>
   apiCall('/api/user/notifications/unread-count');
 
+// ============ PREMIUM/SUBSCRIPTION ERROR RESPONSES ============
+
+// Get user's feature limits based on subscription tier
+export const getFeatureLimits = () =>
+  apiCall('/api/payment/feature-limits', { method: 'GET' });
+
 export const downloadGroupResource = (resourceId) =>
   apiCall(`/api/resources/${resourceId}/download`, { method: 'GET' });
 
 export const deleteGroupResource = (resourceId) =>
   apiCall(`/api/resources/${resourceId}`, { method: 'DELETE' });
+
+// ============ PAYMENT ENDPOINTS ============
+
+// Create a Razorpay order
+export const createOrder = (planId, amount, planName) =>
+  apiCall('/api/payment/create-order', {
+    method: 'POST',
+    body: JSON.stringify({ 
+      plan_id: planId, 
+      amount: amount, // in paise
+      plan_name: planName 
+    }),
+  });
+
+// Verify payment after successful checkout
+export const verifyPayment = (orderId, paymentId, signature) =>
+  apiCall('/api/payment/verify', {
+    method: 'POST',
+    body: JSON.stringify({ 
+      order_id: orderId, 
+      payment_id: paymentId, 
+      signature: signature 
+    }),
+  });
+
+// Get current subscription status
+export const getSubscriptionStatus = () =>
+  apiCall('/api/payment/subscription-status', { method: 'GET' });

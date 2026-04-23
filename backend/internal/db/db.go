@@ -23,6 +23,7 @@ func Init() {
 		if !contains(connStr, "sslmode") {
 			connStr += "?sslmode=require"
 		}
+		fmt.Println("📡 Using DATABASE_URL (Production mode)")
 	} else {
 		// Development: Use individual environment variables
 		user := os.Getenv("DB_USER")
@@ -51,6 +52,7 @@ func Init() {
 		}
 		connStr = fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=%s",
 			user, password, host, port, name, sslmode)
+		fmt.Printf("📡 Using individual env vars (Development mode) - connecting to %s\n", host)
 	}
 	
 	var err error
@@ -94,6 +96,7 @@ func runMigrations() {
 		"migrate_bio.sql",
 		"migrate_user_fields.sql",
 		"migrate_privacy_settings.sql",
+		"migrate_payments.sql",
 	}
 
 	// Get the correct migration path

@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, User, Mail, Lock, Shield, Eye, EyeOff, Palette, Save, Check, Camera, MapPin, Briefcase, BookOpen, Moon, Sun, Monitor, Type, AlertCircle, ChevronRight, X } from 'lucide-react';
+import { ArrowLeft, User, Mail, Lock, Shield, Eye, EyeOff, Palette, Save, Check, Camera, MapPin, Briefcase, BookOpen, Moon, Sun, Monitor, Type, AlertCircle, ChevronRight, X, Crown } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { getProfile, updateProfile, changePassword } from './utils/api';
 import { useTheme } from './contexts/ThemeContext';
+import PremiumSettings from './components/PremiumSettings';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080';
 
@@ -78,6 +79,7 @@ export default function SettingsPage() {
 
   const sections = [
     { id: 'profile', name: 'Profile', icon: User, strip: '#1d4ed8' },
+    { id: 'premium', name: 'Premium', icon: Crown, strip: '#db2777' },
     { id: 'account', name: 'Account', icon: Mail, strip: '#6b21a8' },
     { id: 'security', name: 'Security', icon: Lock, strip: '#065f46' },
     { id: 'privacy', name: 'Privacy', icon: Shield, strip: '#0e7490' },
@@ -209,6 +211,11 @@ export default function SettingsPage() {
                   </div>
                 </div>
               </>
+            )}
+
+            {/* ── Premium ── */}
+            {activeSection === 'premium' && (
+              <PremiumSettings isDark={isDark} />
             )}
 
             {/* ── Account ── */}

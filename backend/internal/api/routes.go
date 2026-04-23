@@ -87,6 +87,12 @@ func RegisterRoutes(r *mux.Router) {
 	r.HandleFunc("/api/resources/{resourceId:[0-9]+}/download", handlers.DownloadGroupResource).Methods("GET")
 	r.HandleFunc("/api/resources/{resourceId:[0-9]+}", handlers.DeleteGroupResource).Methods("DELETE")
 
+	// Payment Routes
+	r.HandleFunc("/api/payment/create-order", handlers.CreateOrder).Methods("POST")
+	r.HandleFunc("/api/payment/verify", handlers.VerifyPayment).Methods("POST")
+	r.HandleFunc("/api/payment/subscription-status", handlers.GetSubscriptionStatus).Methods("GET")
+	r.HandleFunc("/api/payment/feature-limits", handlers.GetFeatureLimits).Methods("GET")
+
 	r.HandleFunc("/api/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("API running 🚀"))
 	}).Methods("GET")

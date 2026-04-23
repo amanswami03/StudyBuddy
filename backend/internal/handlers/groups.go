@@ -3,9 +3,11 @@ package handlers
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 	"studybuddy/internal/db"
 	"time"
 
@@ -13,6 +15,84 @@ import (
 	"github.com/lib/pq"
 	"golang.org/x/crypto/bcrypt"
 )
+
+// SubscriptionTier represents user subscription level
+type SubscriptionTier string
+
+const (
+	TierFree  SubscriptionTier = "free"
+	TierPro   SubscriptionTier = "pro"
+	TierUltra SubscriptionTier = "ultra"
+)
+
+// FeatureLimits defines limits for each tier
+type FeatureLimits struct {
+	MaxGroups int
+	MaxStorage int
+}
+
+var tierLimits = map[SubscriptionTier]FeatureLimits{
+	TierFree:  {MaxGroups: 3, MaxStorage: 5},
+	TierPro:   {MaxGroups: 10, MaxStorage: 100},
+	TierUltra: {MaxGroups: 999999, MaxStorage: 999999},
+}
+
+// GetUserSubscriptionTier retrieves the subscription tier for a user
+func GetUserSubscriptionTier(userID int) SubscriptionTier {
+	var planName string
+	var status string
+	var expiresAt sql.NullTime
+
+	err := db.DB.QueryRow(
+		`SELECT plan_name, status, expires_at FROM subscriptions WHERE user_id=$1 ORDER BY created_at DESC LIMIT 1`,
+		userID,
+	).Scan(&planName, &status, &expiresAt)
+
+	if err != nil || err == sql.ErrNoRows {
+		// No subscription found
+		return TierFree
+	}
+
+	// Check if subscription is expired
+	if expiresAt.Valid && expiresAt.Time.Before(time.Now()) {
+		return TierFree
+	}
+
+	// Check if subscription is active
+	if status != "active" {
+		return TierFree
+	}
+
+	// Return tier based on plan name
+	switch strings.ToLower(planName) {
+	case "pro":
+		return TierPro
+	case "ultra":
+		return TierUltra
+	default:
+		return TierFree
+	}
+}
+
+// GetUserGroupCount returns the number of groups the user has created
+func GetUserGroupCount(userID int) (int, error) {
+	var count int
+	err := db.DB.QueryRow(
+		`SELECT COUNT(*) FROM groups WHERE created_by=$1`,
+		userID,
+	).Scan(&count)
+	return count, err
+}
+
+// GetUserJoinedGroupCount returns the number of groups the user has joined (including created)
+func GetUserJoinedGroupCount(userID int) (int, error) {
+	var count int
+	err := db.DB.QueryRow(
+		`SELECT COUNT(DISTINCT group_id) FROM group_members WHERE user_id=$1`,
+		userID,
+	).Scan(&count)
+	return count, err
+}
 
 // Request/response DTOs
 type CreateGroupRequest struct {
@@ -55,6 +135,30 @@ func CreateGroup(w http.ResponseWriter, r *http.Request) {
 	userID, err := GetUserIDFromRequest(r)
 	if err != nil {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	// Check subscription tier and group limit
+	tier := GetUserSubscriptionTier(userID)
+	limits := tierLimits[tier]
+	groupCount, err := GetUserGroupCount(userID)
+	if err != nil {
+		log.Printf("Error getting group count: %v", err)
+		http.Error(w, "server error", http.StatusInternalServerError)
+		return
+	}
+
+	if groupCount >= limits.MaxGroups {
+		tierStr := string(tier)
+		if tierStr == "free" {
+			tierStr = "Free"
+		} else if tierStr == "pro" {
+			tierStr = "Pro"
+		} else {
+			tierStr = "Ultra"
+		}
+		errorMsg := fmt.Sprintf("group limit reached for %s tier (%d/%d). Upgrade your subscription to create more groups", tierStr, groupCount, limits.MaxGroups)
+		http.Error(w, errorMsg, http.StatusForbidden)
 		return
 	}
 
@@ -160,6 +264,30 @@ func JoinGroup(w http.ResponseWriter, r *http.Request) {
 	userID, err := GetUserIDFromRequest(r)
 	if err != nil {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	// Check subscription tier and group join limit
+	tier := GetUserSubscriptionTier(userID)
+	limits := tierLimits[tier]
+	joinedCount, err := GetUserJoinedGroupCount(userID)
+	if err != nil {
+		log.Printf("Error getting joined group count: %v", err)
+		http.Error(w, "server error", http.StatusInternalServerError)
+		return
+	}
+
+	if joinedCount >= limits.MaxGroups {
+		tierStr := string(tier)
+		if tierStr == "free" {
+			tierStr = "Free"
+		} else if tierStr == "pro" {
+			tierStr = "Pro"
+		} else {
+			tierStr = "Ultra"
+		}
+		errorMsg := fmt.Sprintf("group limit reached for %s tier (%d/%d). Upgrade your subscription to join more groups", tierStr, joinedCount, limits.MaxGroups)
+		http.Error(w, errorMsg, http.StatusForbidden)
 		return
 	}
 
@@ -500,6 +628,13 @@ func PostGroupMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Trim whitespace from content
+	req.Content = strings.TrimSpace(req.Content)
+	if req.Content == "" {
+		http.Error(w, "content cannot be empty after trimming", http.StatusBadRequest)
+		return
+	}
+
 	// Get sender name
 	var senderName string
 	err = db.DB.QueryRow(`SELECT username FROM users WHERE id=$1`, userID).Scan(&senderName)
@@ -511,15 +646,19 @@ func PostGroupMessage(w http.ResponseWriter, r *http.Request) {
 	now := time.Now().UTC()
 	var messageID int64
 	err = db.DB.QueryRow(
-		`INSERT INTO messages (group_id, sender_id, sender_name, content, created_at) 
-		VALUES ($1, $2, $3, $4, $5) RETURNING id`,
-		groupID, userID, senderName, req.Content, now,
+		`INSERT INTO messages (group_id, sender_id, sender_name, content, created_at, message_type) 
+		VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
+		groupID, userID, senderName, req.Content, now, "text",
 	).Scan(&messageID)
 
 	if err != nil {
-		http.Error(w, "Failed to save message", http.StatusInternalServerError)
+		fmt.Printf("❌ Failed to save message to DB: %v\n", err)
+		fmt.Printf("   GroupID: %d, UserID: %d, Content: %s\n", groupID, userID, req.Content)
+		http.Error(w, "Failed to save message: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
+
+	fmt.Printf("✅ Message saved: ID=%d, GroupID=%d, UserID=%d\n", messageID, groupID, userID)
 
 	// Get group name
 	var groupName string
@@ -541,6 +680,9 @@ func PostGroupMessage(w http.ResponseWriter, r *http.Request) {
 				// Create notification for this member
 				notifyTitle := "New message in " + groupName
 				notifyMessage := senderName + ": " + req.Content
+				if len(notifyMessage) > 100 {
+					notifyMessage = notifyMessage[:100] + "..."
+				}
 				db.CreateNotification(memberID, "new_message", notifyTitle, notifyMessage, &groupID, nil, nil)
 			}
 		}
@@ -548,15 +690,20 @@ func PostGroupMessage(w http.ResponseWriter, r *http.Request) {
 
 	// Return the saved message with real ID
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"id":           messageID,
-		"clientTempId": req.ClientTempID,
-		"group_id":     groupID,
-		"sender_id":    userID,
-		"sender_name":  senderName,
-		"content":      req.Content,
-		"created_at":   now.Format(time.RFC3339),
-	})
+	response := map[string]interface{}{
+		"id":            messageID,
+		"clientTempId":  req.ClientTempID,
+		"group_id":      groupID,
+		"sender_id":     userID,
+		"sender_name":   senderName,
+		"content":       req.Content,
+		"created_at":    now.Format(time.RFC3339),
+		"message_type":  "text",
+	}
+	
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		fmt.Printf("❌ Failed to encode response: %v\n", err)
+	}
 }
 
 // Helper: Check if user is admin of group

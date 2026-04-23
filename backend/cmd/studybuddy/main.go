@@ -14,10 +14,15 @@ import (
 	"studybuddy/internal/ws"
 
 	"github.com/gorilla/mux"
+	"github.com/joho/godotenv"
 	"github.com/rs/cors"
 )
 
 func main() {
+	// Load .env file (optional, won't fail if missing)
+	_ = godotenv.Load("../../.env")
+	godotenv.Load(".env") // Also try loading from current directory
+	
 	db.Init()
 
 	hub := ws.NewHub()

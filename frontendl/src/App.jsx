@@ -7,6 +7,7 @@ import GroupDetail from './GroupDetail';
 import Calendar from './Calendar';
 import UserProfile from './UserProfile';
 import SettingsPage from './SettingsPage';
+import SubscriptionPlans from './components/SubscriptionPlans';
 import { ThemeProvider } from './contexts/ThemeContext';
 
 // Create context for online/offline status
@@ -203,6 +204,7 @@ function AppRoutes() {
         <Route path="/profile" element={<UserProfile />} />
         <Route path="/profile/:userId" element={<UserProfile />} />
         <Route path="/settings" element={<SettingsPage />} />
+        <Route path="/subscriptions" element={<SubscriptionPlans />} />
         <Route path="/group/:id" element={<GroupDetail />} />
         <Route path="*" element={<HomePage />} />
       </Routes>
