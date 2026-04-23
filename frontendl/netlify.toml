@@ -10,3 +10,4 @@
 [env]
   [env.production]
     VITE_API_URL = "https://studybuddy-1-sr8z.onrender.com"
+    VITE_RAZORPAY_KEY_ID = "rzp_test_Sgz4NF1ltVdJMx"
