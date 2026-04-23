@@ -1,7 +1,7 @@
 [build]
   base = "frontendl"
   command = "npm run build"
-  publish = "frontendl/dist"
+  publish = "dist"
 
 [[redirects]]
   from = "/*"
