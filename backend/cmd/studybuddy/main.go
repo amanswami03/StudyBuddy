@@ -42,12 +42,18 @@ func main() {
 	})
 
 	// Enable CORS with permissive settings for cross-origin requests
+	allowedOrigins := []string{
+		"http://localhost:3000",      // Local dev
+		"http://localhost:5173",      // Vite default
+		"https://elegant-tulumba-58d957.netlify.app", // Netlify production
+		"*", // Fallback for any origin (allows all)
+	}
 	c := cors.New(cors.Options{
-		AllowedOrigins: []string{"*"}, // Allow all origins (can restrict later)
+		AllowedOrigins: allowedOrigins,
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"},
 		AllowedHeaders:   []string{"*"},
 		ExposedHeaders:   []string{"Content-Length", "Content-Type", "Authorization"},
-		AllowCredentials: false, // Must be false when using "*"
+		AllowCredentials: false,
 		MaxAge:           300,
 	})
 
