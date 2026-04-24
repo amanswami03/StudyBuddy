@@ -110,8 +110,8 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 		// persist message in DB - ALWAYS use UTC
 		now := time.Now().UTC()
 		_, err := db.DB.Exec(
-			`INSERT INTO messages (group_id, sender_id, sender_name, content, created_at, message_type) VALUES ($1,$2,$3,$4,$5,$6)`,
-			m.GroupID, m.SenderID, m.SenderName, m.Content, now, "text",
+			`INSERT INTO messages (group_id, sender, sender_id, sender_name, content, created_at, message_type) VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+			m.GroupID, m.SenderName, m.SenderID, m.SenderName, m.Content, now, "text",
 		)
 		if err != nil {
 			// log but continue to broadcast

@@ -85,6 +85,8 @@ func runMigrations() {
 		"migrates.sql",
 		"migrations_groups_create.sql",
 		"migrate_messages.sql",
+		"migrate_messages_fix_sender_id.sql",
+		"migrate_messages_fix_columns.sql",
 		"migrate_groups.sql",
 		"migrate_groups_v2.sql",
 		"migrate_join_requests.sql",

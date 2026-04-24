@@ -517,7 +517,8 @@ func GetGroupMessages(w http.ResponseWriter, r *http.Request) {
 		FROM groups WHERE id=$1`, gid, userID).Scan(&isMember, &allowWithoutJoin)
 	
 	if err != nil {
-		http.Error(w, "group not found", http.StatusNotFound)
+		fmt.Println("ERROR checking group permissions for group", gid, "user", userID, ":", err)
+		http.Error(w, fmt.Sprintf("group error: %v", err), http.StatusNotFound)
 		return
 	}
 
@@ -534,10 +535,11 @@ func GetGroupMessages(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rows, err := db.DB.Query(`SELECT id, group_id, sender_id, sender_name, content, created_at
+	rows, err := db.DB.Query(`SELECT id, group_id, COALESCE(sender_id, 0) as sender_id, COALESCE(sender_name, sender) as sender_name, content, created_at
 		FROM messages WHERE group_id=$1 ORDER BY created_at DESC LIMIT 100`, gid)
 	if err != nil {
-		http.Error(w, "db error", http.StatusInternalServerError)
+		fmt.Println("ERROR querying messages for group", gid, ":", err)
+		http.Error(w, fmt.Sprintf("db error: %v", err), http.StatusInternalServerError)
 		return
 	}
 	defer rows.Close()
@@ -646,9 +648,9 @@ func PostGroupMessage(w http.ResponseWriter, r *http.Request) {
 	now := time.Now().UTC()
 	var messageID int64
 	err = db.DB.QueryRow(
-		`INSERT INTO messages (group_id, sender_id, sender_name, content, created_at, message_type) 
-		VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
-		groupID, userID, senderName, req.Content, now, "text",
+		`INSERT INTO messages (group_id, sender, sender_id, sender_name, content, created_at, message_type) 
+		VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
+		groupID, senderName, userID, senderName, req.Content, now, "text",
 	).Scan(&messageID)
 
 	if err != nil {

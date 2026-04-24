@@ -99,8 +99,8 @@ func UploadMessage(w http.ResponseWriter, r *http.Request) {
 	now := time.Now().UTC()
 	var messageID int64
 	err = db.DB.QueryRow(
-		`INSERT INTO messages (group_id, sender_id, sender_name, content, created_at, message_type) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id`,
-		groupID, uid, senderName, string(metaBytes), now, "file",
+		`INSERT INTO messages (group_id, sender, sender_id, sender_name, content, created_at, message_type) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id`,
+		groupID, senderName, uid, senderName, string(metaBytes), now, "file",
 	).Scan(&messageID)
 	if err != nil {
 		// log and continue
