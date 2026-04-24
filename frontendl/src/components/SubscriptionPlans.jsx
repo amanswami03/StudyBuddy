@@ -91,7 +91,7 @@ const SubscriptionPlans = () => {
     },
   ];
 
-  const handleSelectPlan = (plan) => {
+  const handleSelectPlan = async (plan) => {
     if (plan.priceInPaise === 0) {
       alert('You are already on the Free plan!');
       return;
@@ -110,45 +110,110 @@ const SubscriptionPlans = () => {
 
     setProcessingPayment(true);
 
-    // Razorpay options with dynamic amount
-    const options = {
-      key: import.meta.env.VITE_RAZORPAY_KEY_ID,
-      amount: plan.priceInPaise, // in paise
-      currency: 'INR',
-      name: 'StudyBuddy',
-      description: `${plan.name} Plan - ₹${plan.price}/month`,
-      handler: function (response) {
-        // Payment successful - you can verify on backend if needed
-        console.log('✅ Payment successful!', response);
-        alert(`✅ Payment of ₹${plan.price} successful!\nOrder ID: ${response.razorpay_order_id}`);
-        setProcessingPayment(false);
-        // Reload subscription status
-        getSubscriptionStatus().then(setSubscriptionStatus);
-      },
-      prefill: {
-        name: 'StudyBuddy User',
-        email: 'user@studybuddy.com',
-      },
-      theme: {
-        color: '#3b82f6',
-      },
-      modal: {
-        ondismiss: function () {
-          console.log('Payment modal closed');
-          setProcessingPayment(false);
+    try {
+      // Step 1: Create order on backend
+      console.log(`📝 Creating order for plan: ${plan.name}, amount: ${plan.priceInPaise} paise`);
+      const apiUrl = import.meta.env.VITE_API_URL;
+      const createOrderResponse = await fetch(`${apiUrl}/api/payment/create-order`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
         },
-      },
-    };
+        body: JSON.stringify({
+          plan_id: plan.id,
+          amount: plan.priceInPaise,
+          plan_name: plan.name,
+        }),
+      });
 
-    const rzp = new window.Razorpay(options);
-    
-    rzp.on('payment.failed', function (response) {
-      console.error('❌ Payment failed:', response.error);
-      alert(`Payment failed: ${response.error.description}`);
+      if (!createOrderResponse.ok) {
+        throw new Error(`Failed to create order: ${createOrderResponse.statusText}`);
+      }
+
+      const orderData = await createOrderResponse.json();
+      if (!orderData.id) {
+        throw new Error('No order ID received from backend');
+      }
+
+      console.log(`✅ Order created: ${orderData.id}`);
+
+      // Step 2: Initialize Razorpay with order_id (MANDATORY for live payments)
+      const keyId = import.meta.env.VITE_RAZORPAY_KEY_ID;
+      if (!keyId || !keyId.startsWith('rzp_')) {
+        throw new Error('Razorpay Key ID not properly configured');
+      }
+
+      const options = {
+        key: keyId,
+        amount: plan.priceInPaise, // in paise
+        currency: 'INR',
+        name: 'StudyBuddy',
+        description: `${plan.name} Plan - ₹${plan.price}/month`,
+        order_id: orderData.id, // CRITICAL: Must pass order_id for live payments
+        handler: async function (response) {
+          try {
+            // Step 3: Verify payment signature on backend
+            console.log('✅ Payment completed! Verifying signature...');
+            const verifyResponse = await fetch(`${apiUrl}/api/payment/verify`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`,
+              },
+              body: JSON.stringify({
+                order_id: response.razorpay_order_id,
+                payment_id: response.razorpay_payment_id,
+                signature: response.razorpay_signature,
+              }),
+            });
+
+            if (!verifyResponse.ok) {
+              throw new Error('Payment verification failed');
+            }
+
+            console.log('✅ Payment verified successfully!');
+            alert(`✅ Payment of ₹${plan.price} successful!\nOrder ID: ${response.razorpay_order_id}`);
+            
+            // Reload subscription status
+            const status = await getSubscriptionStatus();
+            setSubscriptionStatus(status);
+          } catch (err) {
+            console.error('❌ Payment verification failed:', err);
+            alert(`Payment verification failed: ${err.message}`);
+          } finally {
+            setProcessingPayment(false);
+          }
+        },
+        prefill: {
+          name: 'StudyBuddy User',
+          email: 'user@studybuddy.com',
+        },
+        theme: {
+          color: '#3b82f6',
+        },
+        modal: {
+          ondismiss: function () {
+            console.log('Payment modal closed');
+            setProcessingPayment(false);
+          },
+        },
+      };
+
+      const rzp = new window.Razorpay(options);
+      
+      rzp.on('payment.failed', function (response) {
+        console.error('❌ Payment failed:', response.error);
+        alert(`Payment failed: ${response.error.description}`);
+        setProcessingPayment(false);
+      });
+
+      rzp.open();
+    } catch (err) {
+      console.error('❌ Error initiating payment:', err);
+      alert(`Error: ${err.message}`);
       setProcessingPayment(false);
-    });
-
-    rzp.open();
+    }
   };
 
   // COMMENTED OUT - Payment handled directly in handleSelectPlan

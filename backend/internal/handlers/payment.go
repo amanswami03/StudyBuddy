@@ -66,6 +66,10 @@ func CreateOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Log key ID (secret is hidden for security)
+	log.Printf("📝 Using Razorpay Key ID: %s (length: %d)", keyID, len(keyID))
+	log.Printf("📝 Using Razorpay Key Secret (length: %d)", len(keySecret))
+
 	// Initialize Razorpay client
 	client := razorpay.NewClient(keyID, keySecret)
 
