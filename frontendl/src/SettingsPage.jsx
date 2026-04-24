@@ -31,15 +31,41 @@ export default function SettingsPage() {
     const loadProfile = async () => {
       try {
         const token = localStorage.getItem('sb_token');
-        if (!token) { setLoading(false); return; }
+        if (!token) { 
+          console.warn('No auth token found');
+          setLoading(false); 
+          return; 
+        }
+        console.log('Loading profile...');
         const data = await getProfile();
+        console.log('Profile data loaded:', data);
         let photoUrl = data.profile_pic || null;
         if (photoUrl && !photoUrl.startsWith('http')) photoUrl = `${API_BASE}${photoUrl}`;
-        const np = { name: data.username || '', email: data.email || '', phone: data.phone || '', location: data.location || '', university: data.university || '', major: data.major || '', bio: data.bio || '', photoUrl };
+        const np = { 
+          name: data.username || '', 
+          email: data.email || '', 
+          phone: data.phone || '', 
+          location: data.location || '', 
+          university: data.university || '', 
+          major: data.major || '', 
+          bio: data.bio || '', 
+          photoUrl 
+        };
         setProfileData(np);
         setInitialProfileData(np);
-        setPrivacySettings({ showEmail: data.show_email || false, showPhone: data.show_phone || false, showLocation: data.show_location || false, showUniversity: data.show_university || false, showBio: data.show_bio || false });
-      } catch (e) { console.error(e); } finally { setLoading(false); }
+        setPrivacySettings({ 
+          showEmail: data.show_email || false, 
+          showPhone: data.show_phone || false, 
+          showLocation: data.show_location || false, 
+          showUniversity: data.show_university || false, 
+          showBio: data.show_bio || false 
+        });
+      } catch (e) { 
+        console.error('Failed to load profile:', e);
+        alert('Failed to load profile. Please refresh the page.');
+      } finally { 
+        setLoading(false); 
+      }
     };
     loadProfile();
   }, []);
@@ -48,12 +74,29 @@ export default function SettingsPage() {
     setSaving(true);
     try {
       const token = localStorage.getItem('sb_token');
-      if (!token) { alert('Please log in first'); return; }
-      await updateProfile({ username: profileData.name, phone: profileData.phone, location: profileData.location, university: profileData.university, major: profileData.major, bio: profileData.bio, show_email: privacySettings.showEmail, show_phone: privacySettings.showPhone, show_location: privacySettings.showLocation, show_university: privacySettings.showUniversity, show_bio: privacySettings.showBio });
+      if (!token) { alert('Please log in first'); setSaving(false); return; }
+      console.log('Saving profile with data:', profileData);
+      await updateProfile({ 
+        username: profileData.name, 
+        phone: profileData.phone, 
+        location: profileData.location, 
+        university: profileData.university, 
+        major: profileData.major, 
+        bio: profileData.bio, 
+        show_email: privacySettings.showEmail, 
+        show_phone: privacySettings.showPhone, 
+        show_location: privacySettings.showLocation, 
+        show_university: privacySettings.showUniversity, 
+        show_bio: privacySettings.showBio 
+      });
+      console.log('Profile saved successfully');
       setInitialProfileData(profileData);
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
-    } catch (e) { alert('Failed to save profile. Please try again.'); }
+    } catch (e) { 
+      console.error('Profile save error:', e);
+      alert(`Failed to save profile: ${e.message || 'Please try again.'}`); 
+    }
     finally { setSaving(false); }
   };
 
