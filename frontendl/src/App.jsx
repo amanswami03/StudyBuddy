@@ -223,7 +223,7 @@ export default function App() {
     const checkBackendHealth = async () => {
       try {
         const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080';
-        const response = await fetch(`${API_BASE}/health`, {
+        const response = await fetch(`${API_BASE}/api/health`, {
           method: 'GET',
           signal: AbortSignal.timeout(3000) // 3 second timeout
         });
