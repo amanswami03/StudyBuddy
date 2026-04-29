@@ -2,9 +2,11 @@ import { useState } from 'react';
 // import RazorpayCheckout from './RazorpayCheckout'; // COMMENTED OUT - Using Razorpay Payment Buttons
 import { getSubscriptionStatus } from '../utils/api';
 import { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Check } from 'lucide-react';
 
 const SubscriptionPlans = () => {
+  const navigate = useNavigate();
   // const [showCheckout, setShowCheckout] = useState(false); // COMMENTED OUT
   // const [selectedPlan, setSelectedPlan] = useState(null); // COMMENTED OUT
   const [subscriptionStatus, setSubscriptionStatus] = useState(null);
@@ -178,6 +180,11 @@ const SubscriptionPlans = () => {
             // Reload subscription status
             const status = await getSubscriptionStatus();
             setSubscriptionStatus(status);
+            
+            // Redirect to premium settings after successful payment
+            setTimeout(() => {
+              navigate('/settings', { state: { activeSection: 'premium' } });
+            }, 1000);
           } catch (err) {
             console.error('❌ Payment verification failed:', err);
             alert(`Payment verification failed: ${err.message}`);
@@ -254,7 +261,10 @@ const SubscriptionPlans = () => {
         {/* Plans Grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16">
           {plans.map((plan) => {
-            const isCurrentPlan = isSubscribed && currentPlan === plan.name.toLowerCase();
+            // Allow button click unless already on this exact plan
+            const isCurrentPlan = isSubscribed && currentPlan === plan.name.toLowerCase() && plan.priceInPaise !== 0;
+            const isFreePlan = plan.priceInPaise === 0;
+            
             return (
               <div
                 key={plan.id}
@@ -306,7 +316,7 @@ const SubscriptionPlans = () => {
                       : 'bg-slate-100 text-slate-900 hover:bg-slate-200 active:bg-slate-300'
                   }`}
                 >
-                  {processingPayment ? 'Processing...' : isCurrentPlan ? 'Current Plan' : plan.cta}
+                  {processingPayment ? 'Processing...' : isCurrentPlan ? 'Current Plan' : isFreePlan && isSubscribed ? 'Current Plan' : isSubscribed && plan.name.toLowerCase() > currentPlan ? 'Upgrade' : isSubscribed && plan.name.toLowerCase() < currentPlan ? 'Downgrade' : plan.cta}
                 </button>
               </div>
             );

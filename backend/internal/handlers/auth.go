@@ -1,11 +1,14 @@
 package handlers
 
 import (
+	"crypto/rand"
 	"database/sql"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -168,4 +171,228 @@ func GetUserIDFromToken(tokenStr string) (int, error) {
 	default:
 		return 0, errors.New("invalid user_id type")
 	}
+}
+
+// ForgotPassword generates a reset token and sends email
+func ForgotPassword(w http.ResponseWriter, r *http.Request) {
+	type ForgotPasswordRequest struct {
+		Email string `json:"email"`
+	}
+
+	var req ForgotPasswordRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request", http.StatusBadRequest)
+		return
+	}
+
+	if req.Email == "" {
+		http.Error(w, "Email is required", http.StatusBadRequest)
+		return
+	}
+
+	// Check if user exists
+	var userID int
+	err := db.DB.QueryRow(`SELECT id FROM users WHERE LOWER(email) = LOWER($1)`, req.Email).Scan(&userID)
+	if err == sql.ErrNoRows {
+		// Don't reveal if email exists for security, but log it
+		fmt.Printf("⚠️  Forgot password request for non-existent email: %s\n", req.Email)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"message": "If this email exists, you will receive a reset link",
+		})
+		return
+	}
+	if err != nil {
+		http.Error(w, "Database error", http.StatusInternalServerError)
+		return
+	}
+
+	// Generate reset token
+	resetToken := generateResetToken()
+	expiresAt := time.Now().AddDate(0, 0, 1) // 24 hours
+
+	// Store token in database
+	_, err = db.DB.Exec(
+		`UPDATE users SET reset_token=$1, reset_token_expires=$2 WHERE id=$3`,
+		resetToken, expiresAt, userID,
+	)
+	if err != nil {
+		fmt.Printf("❌ Error storing reset token: %v\n", err)
+		http.Error(w, "Failed to generate reset link", http.StatusInternalServerError)
+		return
+	}
+
+	// Send email with reset link
+	frontendURL := os.Getenv("FRONTEND_URL")
+	if frontendURL == "" {
+		frontendURL = "http://localhost:5173"
+	}
+	resetLink := fmt.Sprintf("%s/reset-password?token=%s", frontendURL, resetToken)
+
+	err = sendPasswordResetEmail(req.Email, resetLink)
+	if err != nil {
+		fmt.Printf("❌ Error sending email: %v\n", err)
+		http.Error(w, "Failed to send reset email", http.StatusInternalServerError)
+		return
+	}
+
+	fmt.Printf("✅ Password reset email sent to: %s\n", req.Email)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"message": "If this email exists, you will receive a reset link",
+	})
+}
+
+// ResetPassword resets the password using the reset token
+func ResetPassword(w http.ResponseWriter, r *http.Request) {
+	type ResetPasswordRequest struct {
+		Token       string `json:"token"`
+		NewPassword string `json:"new_password"`
+	}
+
+	var req ResetPasswordRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request", http.StatusBadRequest)
+		return
+	}
+
+	if req.Token == "" || req.NewPassword == "" {
+		http.Error(w, "Token and new password are required", http.StatusBadRequest)
+		return
+	}
+
+	if len(req.NewPassword) < 6 {
+		http.Error(w, "Password must be at least 6 characters", http.StatusBadRequest)
+		return
+	}
+
+	// Find user with this token
+	var userID int
+	var expiresAt sql.NullTime
+	err := db.DB.QueryRow(
+		`SELECT id, reset_token_expires FROM users WHERE reset_token=$1`,
+		req.Token,
+	).Scan(&userID, &expiresAt)
+
+	if err == sql.ErrNoRows {
+		http.Error(w, "Invalid reset token", http.StatusBadRequest)
+		return
+	}
+	if err != nil {
+		http.Error(w, "Database error", http.StatusInternalServerError)
+		return
+	}
+
+	// Check if token is expired
+	if expiresAt.Valid && expiresAt.Time.Before(time.Now()) {
+		http.Error(w, "Reset token has expired", http.StatusBadRequest)
+		return
+	}
+
+	// Hash new password
+	hash, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
+	if err != nil {
+		http.Error(w, "Error hashing password", http.StatusInternalServerError)
+		return
+	}
+
+	// Update password and clear reset token
+	_, err = db.DB.Exec(
+		`UPDATE users SET password=$1, reset_token=NULL, reset_token_expires=NULL WHERE id=$2`,
+		string(hash), userID,
+	)
+	if err != nil {
+		fmt.Printf("❌ Error updating password: %v\n", err)
+		http.Error(w, "Failed to reset password", http.StatusInternalServerError)
+		return
+	}
+
+	fmt.Printf("✅ Password reset successfully for user %d\n", userID)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"message": "Password reset successful",
+	})
+}
+
+// Helper function to generate a secure reset token
+func generateResetToken() string {
+	b := make([]byte, 32)
+	rand.Read(b)
+	return hex.EncodeToString(b)
+}
+
+// Helper function to send password reset email via SendGrid
+func sendPasswordResetEmail(email, resetLink string) error {
+	apiKey := os.Getenv("SENDGRID_API_KEY")
+	if apiKey == "" {
+		return fmt.Errorf("SENDGRID_API_KEY not configured")
+	}
+
+	fromEmail := os.Getenv("SENDGRID_FROM_EMAIL")
+	if fromEmail == "" {
+		fromEmail = "noreply@studybuddy.com"
+	}
+
+	// SendGrid API endpoint
+	url := "https://api.sendgrid.com/v3/mail/send"
+
+	// Email payload
+	payload := map[string]interface{}{
+		"personalizations": []map[string]interface{}{
+			{
+				"to": []map[string]string{
+					{"email": email},
+				},
+			},
+		},
+		"from": map[string]string{
+			"email": fromEmail,
+			"name":  "StudyBuddy",
+		},
+		"subject": "Reset Your StudyBuddy Password",
+		"content": []map[string]string{
+			{
+				"type": "text/html",
+				"value": fmt.Sprintf(`
+					<h2>Password Reset Request</h2>
+					<p>You requested to reset your StudyBuddy password.</p>
+					<p>Click the link below to reset your password (valid for 24 hours):</p>
+					<p><a href="%s" style="background-color: #3b82f6; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">Reset Password</a></p>
+					<p>Or copy this link: %s</p>
+					<p>If you didn't request this, please ignore this email.</p>
+					<hr>
+					<p><small>StudyBuddy - Learning Management System</small></p>
+				`, resetLink, resetLink),
+			},
+		},
+	}
+
+	// Marshal payload
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("error marshaling email payload: %v", err)
+	}
+
+	// Create request
+	req, err := http.NewRequest("POST", url, strings.NewReader(string(body)))
+	if err != nil {
+		return fmt.Errorf("error creating request: %v", err)
+	}
+
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", apiKey))
+	req.Header.Set("Content-Type", "application/json")
+
+	// Send request
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("error sending email: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode > 299 {
+		return fmt.Errorf("SendGrid API error: status %d", resp.StatusCode)
+	}
+
+	return nil
 }

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, User, Mail, Lock, Shield, Eye, EyeOff, Palette, Save, Check, Camera, MapPin, Briefcase, BookOpen, Moon, Sun, Monitor, Type, AlertCircle, ChevronRight, X, Crown } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { getProfile, updateProfile, changePassword } from './utils/api';
 import { useTheme } from './contexts/ThemeContext';
 import PremiumSettings from './components/PremiumSettings';
@@ -9,10 +9,14 @@ const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080';
 
 export default function SettingsPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { theme, setTheme, fontSize, setFontSize } = useTheme();
   const isDark = theme === 'dark';
 
-  const [activeSection, setActiveSection] = useState('profile');
+  const [activeSection, setActiveSection] = useState(() => {
+    // Check if redirected from payment page
+    return location.state?.activeSection || 'profile';
+  });
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);

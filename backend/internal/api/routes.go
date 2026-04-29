@@ -10,6 +10,8 @@ import (
 func RegisterRoutes(r *mux.Router) {
 	r.HandleFunc("/api/signup", handlers.Signup).Methods("POST")
 	r.HandleFunc("/api/login", handlers.Login).Methods("POST")
+	r.HandleFunc("/api/forgot-password", handlers.ForgotPassword).Methods("POST")
+	r.HandleFunc("/api/reset-password", handlers.ResetPassword).Methods("POST")
 
 	// Profile routes
 	r.HandleFunc("/api/profile", handlers.GetProfile).Methods("GET")

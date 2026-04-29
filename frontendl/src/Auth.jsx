@@ -270,6 +270,15 @@ export default function Auth() {
               </button>
             </div>
 
+            {/* Forgot Password Link - Only show during login */}
+            {isLogin && (
+              <div className="flex justify-end">
+                <a href="/forgot-password" className="text-xs text-blue-600 hover:text-blue-700 hover:underline font-semibold">
+                  Forgot password?
+                </a>
+              </div>
+            )}
+
             {/* Password strength */}
             {!isLogin && formData.password && (
               <div>

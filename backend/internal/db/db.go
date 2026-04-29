@@ -99,6 +99,7 @@ func runMigrations() {
 		"migrate_user_fields.sql",
 		"migrate_privacy_settings.sql",
 		"migrate_payments.sql",
+		"migrate_password_reset.sql",
 	}
 
 	// Get the correct migration path

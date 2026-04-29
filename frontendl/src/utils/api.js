@@ -501,3 +501,22 @@ export const verifyPayment = (orderId, paymentId, signature) =>
 // Get current subscription status
 export const getSubscriptionStatus = () =>
   apiCall('/api/payment/subscription-status', { method: 'GET' });
+
+// ============ PASSWORD RESET ENDPOINTS ============
+
+// Request password reset email
+export const requestPasswordReset = (email) =>
+  apiCall('/api/forgot-password', {
+    method: 'POST',
+    body: JSON.stringify({ email }),
+  });
+
+// Reset password with token
+export const resetPassword = (token, newPassword) =>
+  apiCall('/api/reset-password', {
+    method: 'POST',
+    body: JSON.stringify({
+      token,
+      new_password: newPassword,
+    }),
+  });
