@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Users, Calendar, FileText, Video, Settings, Send, Paperclip, Smile, Download, Upload, ThumbsUp, MessageSquare, Clock, X, Search, MoreVertical, Phone, Info, Trash2, Crown, Shield } from 'lucide-react';
-import { getGroupMessages, postGroupMessage, getGroup, getGroupMembers, removeGroupMember, makeGroupAdmin, removeGroupAdmin, leaveGroup, updateGroup, canViewGroupContent, getGroupSessions, joinGroupSession, voteForSessionTime, getGroupResources, uploadGroupResource, deleteGroupResource, getGroupJoinRequests, approveJoinRequest, rejectJoinRequest, joinGroup } from './utils/api';
+import { ArrowLeft, Users, Calendar, FileText, Video, Settings, Send, Paperclip, Smile, Download, Upload, ThumbsUp, MessageSquare, Clock, X, Search, MoreVertical, Phone, Info, Trash2, Crown, Shield, Share2, Link2, Copy, Check } from 'lucide-react';
+import { getGroupMessages, postGroupMessage, getGroup, getGroupMembers, removeGroupMember, makeGroupAdmin, removeGroupAdmin, leaveGroup, updateGroup, canViewGroupContent, getGroupSessions, joinGroupSession, voteForSessionTime, getGroupResources, uploadGroupResource, deleteGroupResource, getGroupJoinRequests, approveJoinRequest, rejectJoinRequest, joinGroup, getGroupInviteCode, joinGroupByInviteCode } from './utils/api';
 import ScheduleSessionModal from './components/ScheduleSessionModal';
 import DeleteGroupModal from './components/DeleteGroupModal';
 import UserProfileModal from './components/UserProfileModal';
@@ -50,6 +50,10 @@ export default function GroupDetail() {
   const [settingsLoading, setSettingsLoading] = useState(false);
   const [joinRequests, setJoinRequests] = useState([]);
   const [showJoinRequests, setShowJoinRequests] = useState(false);
+  const [inviteCode, setInviteCode] = useState('');
+  const [showInviteModal, setShowInviteModal] = useState(false);
+  const [inviteLink, setInviteLink] = useState('');
+  const [copiedInvite, setCopiedInvite] = useState(false);
 
   const params = useParams();
   const groupIdParam = params.id ? parseInt(params.id, 10) : null;
@@ -218,6 +222,16 @@ export default function GroupDetail() {
               const requests = await getGroupJoinRequests(groupIdParam);
               if (!isMounted) return;
               setJoinRequests(requests || []);
+              
+              // Fetch invite code for admins
+              try {
+                const inviteData = await getGroupInviteCode(groupIdParam);
+                if (!isMounted) return;
+                setInviteCode(inviteData.invite_code || '');
+                setInviteLink(`${window.location.origin}/invite/${inviteData.invite_code}`);
+              } catch (e) {
+                console.warn('failed to load invite code', e);
+              }
             } catch (e) {
               console.warn('failed to load join requests', e);
               // It's ok if this fails - endpoint might not support it yet
@@ -1105,6 +1119,12 @@ export default function GroupDetail() {
                     className="w-full text-sm font-semibold text-slate-600 hover:text-slate-800 flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-amber-50 transition-colors">
                     <Settings className="w-4 h-4" /> Group Settings
                   </button>
+                  {inviteCode && (
+                    <button onClick={() => setShowInviteModal(true)}
+                      className="w-full text-sm font-semibold text-blue-600 hover:text-blue-800 flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-blue-50 transition-colors">
+                      <Share2 className="w-4 h-4" /> Share Invite Link
+                    </button>
+                  )}
                   <button onClick={() => setShowDeleteModal(true)}
                     className="w-full text-sm font-semibold text-red-600 hover:text-red-700 flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-red-50 transition-colors">
                     <Trash2 className="w-4 h-4" /> Delete Group
@@ -1282,6 +1302,58 @@ export default function GroupDetail() {
         <DeleteGroupModal groupId={groupIdParam} groupName={group.name}
           onClose={() => setShowDeleteModal(false)}
           onGroupDeleted={() => navigate('/dashboard')} />
+      )}
+
+      {/* Share invite link modal */}
+      {showInviteModal && inviteCode && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-paper-lg w-full max-w-md border border-amber-100">
+            <div className="flex items-center justify-between p-5 border-b border-amber-100">
+              <h2 className="text-lg font-extrabold text-slate-800">Share {group.name}</h2>
+              <button onClick={() => setShowInviteModal(false)} className="p-1.5 rounded-xl hover:bg-amber-50 text-slate-400 transition-colors"><X className="w-4 h-4" /></button>
+            </div>
+            <div className="p-5 space-y-4">
+              <p className="text-sm text-slate-600">Share this link to invite others to your group:</p>
+              
+              {/* Invite Link */}
+              <div className="space-y-2">
+                <label className="block text-xs font-semibold text-slate-600">Invite Link</label>
+                <div className="flex gap-2">
+                  <div className="flex-1 px-4 py-2.5 rounded-xl border border-amber-200 bg-amber-50 flex items-center gap-2 text-sm text-slate-700">
+                    <Link2 className="w-4 h-4 flex-shrink-0 text-slate-400" />
+                    <input type="text" value={inviteLink} readOnly className="flex-1 bg-transparent outline-none text-xs" />
+                  </div>
+                  <button onClick={() => {
+                    navigator.clipboard.writeText(inviteLink);
+                    setCopiedInvite(true);
+                    setTimeout(() => setCopiedInvite(false), 2000);
+                  }}
+                    className="px-4 py-2.5 rounded-xl bg-blue-700 hover:bg-blue-800 text-white text-sm font-semibold transition-all flex items-center gap-2">
+                    {copiedInvite ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                    {copiedInvite ? 'Copied' : 'Copy'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Invite Code */}
+              <div className="space-y-2">
+                <label className="block text-xs font-semibold text-slate-600">Invite Code</label>
+                <p className="text-lg font-mono font-bold text-blue-600 bg-blue-50 px-4 py-2 rounded-xl text-center tracking-wide">{inviteCode}</p>
+              </div>
+
+              {/* Info */}
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-3">
+                <p className="text-xs text-slate-700">
+                  Anyone with this link or code can {groupSettings.requireAdminApproval ? 'request' : 'directly'} join your group.
+                </p>
+              </div>
+
+              <div className="flex gap-3 pt-2 border-t border-amber-100">
+                <button onClick={() => setShowInviteModal(false)} className="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors">Close</button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* User profile modal */}

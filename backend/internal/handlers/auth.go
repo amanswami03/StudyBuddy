@@ -46,7 +46,13 @@ func Signup(w http.ResponseWriter, r *http.Request) {
 	_, err = db.DB.Exec(`INSERT INTO users (username, email, password, created_at)
 	VALUES ($1, $2, $3, $4)`, req.Username, strings.ToLower(req.Email), string(hash), time.Now())
 	if err != nil {
-		http.Error(w, "Email already exists or DB error", http.StatusConflict)
+		errMsg := "Email already exists or DB error"
+		if strings.Contains(err.Error(), "username") {
+			errMsg = "Username already exists"
+		} else if strings.Contains(err.Error(), "email") {
+			errMsg = "Email already exists"
+		}
+		http.Error(w, errMsg, http.StatusConflict)
 		return
 	}
 

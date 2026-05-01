@@ -17,6 +17,7 @@ export default function Auth() {
 
   const [formData, setFormData] = useState({
     name: '',
+    username: '',
     email: '',
     password: '',
     confirmPassword: ''
@@ -31,7 +32,7 @@ export default function Auth() {
   }, [location]);
 
   const resetForm = () => {
-    setFormData({ name: '', email: '', password: '', confirmPassword: '' });
+    setFormData({ name: '', username: '', email: '', password: '', confirmPassword: '' });
     setShowPassword(false);
     setError('');
   };
@@ -72,6 +73,8 @@ export default function Auth() {
     if (!emailValid) { setError('Please enter a valid email address.'); return; }
     if (!isLogin) {
       if (!formData.name.trim()) { setError('Please enter your full name.'); return; }
+      if (!formData.username.trim()) { setError('Please enter a username (letters, numbers, underscores only).'); return; }
+      if (!/^[a-zA-Z0-9_]{3,20}$/.test(formData.username.trim())) { setError('Username must be 3-20 characters, letters, numbers, and underscores only.'); return; }
       if (!acceptTerms) { setError('Please accept the Terms to continue.'); return; }
       if (formData.password !== formData.confirmPassword) { setError('Passwords do not match.'); return; }
       if (passwordStrength < 2) { setError('Please choose a stronger password.'); return; }
@@ -104,10 +107,10 @@ export default function Auth() {
         const res = await fetch(`${API_BASE}/api/signup`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username: formData.name, email: formData.email, password: formData.password })
+          body: JSON.stringify({ username: formData.username, email: formData.email, password: formData.password })
         });
         if (res.status === 201) {
-          localStorage.setItem('sb_username', formData.name);
+          localStorage.setItem('sb_username', formData.username);
           localStorage.setItem('sb_email', formData.email);
           setIsLogin(true);
           setSuccess('Account created! Please sign in.');
@@ -245,6 +248,19 @@ export default function Auth() {
                 <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                 <input name="name" value={formData.name} onChange={handleChange}
                   placeholder="Full name" className={inputCls} autoComplete="name" />
+              </div>
+            )}
+
+            {!isLogin && (
+              <div className="relative">
+                <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <input name="username" value={formData.username} onChange={handleChange}
+                  placeholder="Username (no spaces)" className={inputCls} autoComplete="username" />
+                {formData.username && (
+                  <span className={`absolute right-3 top-1/2 -translate-y-1/2 text-xs ${/^[a-zA-Z0-9_]{3,20}$/.test(formData.username) ? 'text-emerald-500' : 'text-red-400'}`}>
+                    {/^[a-zA-Z0-9_]{3,20}$/.test(formData.username) ? <CheckCircle2 className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
+                  </span>
+                )}
               </div>
             )}
 

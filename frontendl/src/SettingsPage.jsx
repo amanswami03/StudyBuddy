@@ -81,7 +81,6 @@ export default function SettingsPage() {
       if (!token) { alert('Please log in first'); setSaving(false); return; }
       console.log('Saving profile with data:', profileData);
       await updateProfile({ 
-        username: profileData.name, 
         phone: profileData.phone, 
         location: profileData.location, 
         university: profileData.university, 
@@ -226,7 +225,7 @@ export default function SettingsPage() {
                   <h3 className={`font-extrabold text-base mb-5 ${isDark ? 'text-slate-100' : 'text-slate-800'}`}>Personal Information</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {[
-                      { label: 'Display Name', key: 'name', icon: User },
+                      { label: 'Full Name', key: 'name', icon: User },
                       { label: 'Email', key: 'email', icon: Mail, readOnly: true },
                       { label: 'Phone', key: 'phone', icon: null },
                       { label: 'Location', key: 'location', icon: MapPin },
@@ -271,11 +270,12 @@ export default function SettingsPage() {
                 <h3 className={`font-extrabold text-base mb-5 ${isDark ? 'text-slate-100' : 'text-slate-800'}`}>Account Details</h3>
                 <div className="space-y-4">
                   <div>
-                    <label className={labelCls}>Username</label>
+                    <label className={labelCls}>Username <span className="text-xs font-normal text-slate-500">(cannot be changed)</span></label>
                     <div className="relative">
                       <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                      <input type="text" value={profileData.name} onChange={e => setProfileData({ ...profileData, name: e.target.value })} className={`${fieldCls} pl-10`} />
+                      <input type="text" value={profileData.name} readOnly className={`${fieldCls} pl-10 opacity-60 cursor-not-allowed`} />
                     </div>
+                    <p className={`text-xs mt-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Your username is permanent and cannot be changed.</p>
                   </div>
                   <div>
                     <label className={labelCls}>Email Address</label>
@@ -284,12 +284,6 @@ export default function SettingsPage() {
                       <input type="email" value={profileData.email} readOnly className={`${fieldCls} pl-10 opacity-60 cursor-not-allowed`} />
                     </div>
                     <p className={`text-xs mt-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Email cannot be changed from here. Contact support.</p>
-                  </div>
-                  <div className="flex justify-end">
-                    <button onClick={handleSave} disabled={saving}
-                      className="flex items-center gap-2 bg-blue-700 hover:bg-blue-800 text-white px-6 py-2.5 rounded-xl text-sm font-semibold shadow-sm transition-all disabled:opacity-50">
-                      <Save className="w-4 h-4" /> {saving ? 'Saving…' : 'Save Changes'}
-                    </button>
                   </div>
                 </div>
               </div>

@@ -1,7 +1,9 @@
 package handlers
 
 import (
+	"crypto/rand"
 	"database/sql"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -35,6 +37,16 @@ var tierLimits = map[SubscriptionTier]FeatureLimits{
 	TierFree:  {MaxGroups: 3, MaxStorage: 5},
 	TierPro:   {MaxGroups: 10, MaxStorage: 100},
 	TierUltra: {MaxGroups: 999999, MaxStorage: 999999},
+}
+
+// generateInviteCode generates a unique 12-character invite code for a group
+func generateInviteCode() string {
+	bytes := make([]byte, 6)
+	if _, err := rand.Read(bytes); err != nil {
+		// Fallback code if rand fails
+		return fmt.Sprintf("%d", time.Now().Unix())
+	}
+	return hex.EncodeToString(bytes)
 }
 
 // GetUserSubscriptionTier retrieves the subscription tier for a user
@@ -163,10 +175,11 @@ func CreateGroup(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var newID int
+	inviteCode := generateInviteCode()
 	err = db.DB.QueryRow(
-		`INSERT INTO groups (name, username, description, created_by, is_public, allow_content_view_without_join, require_admin_approval, created_at, updated_at) 
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW()) RETURNING id`,
-		req.Name, req.Username, req.Description, userID, req.IsPublic, req.AllowContentViewWithoutJoin, req.RequireAdminApproval,
+		`INSERT INTO groups (name, username, description, created_by, is_public, allow_content_view_without_join, require_admin_approval, invite_code, created_at, updated_at) 
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW()) RETURNING id`,
+		req.Name, req.Username, req.Description, userID, req.IsPublic, req.AllowContentViewWithoutJoin, req.RequireAdminApproval, inviteCode,
 	).Scan(&newID)
 
 	if err != nil {
@@ -1350,4 +1363,141 @@ func DeleteGroup(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"message": "group deleted successfully"})
+}
+
+// GET /api/groups/{id}/invite - Get the invite code for a group
+func GetGroupInviteCode(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	groupIDStr := vars["id"]
+	groupID, err := strconv.Atoi(groupIDStr)
+	if err != nil {
+		http.Error(w, "invalid group id", http.StatusBadRequest)
+		return
+	}
+
+	var inviteCode string
+	err = db.DB.QueryRow(`SELECT invite_code FROM groups WHERE id=$1`, groupID).Scan(&inviteCode)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			http.Error(w, "group not found", http.StatusNotFound)
+		} else {
+			http.Error(w, "db error", http.StatusInternalServerError)
+		}
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{
+		"invite_code": inviteCode,
+	})
+}
+
+// GET /api/groups/invite/{code} - Join group by invite code
+func JoinGroupByInvite(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	inviteCode := vars["code"]
+
+	if inviteCode == "" {
+		http.Error(w, "invite code required", http.StatusBadRequest)
+		return
+	}
+
+	userID, err := GetUserIDFromRequest(r)
+	if err != nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	// Find group by invite code
+	var groupID int
+	err = db.DB.QueryRow(`SELECT id FROM groups WHERE invite_code=$1`, inviteCode).Scan(&groupID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			http.Error(w, "invalid invite code", http.StatusNotFound)
+		} else {
+			http.Error(w, "db error", http.StatusInternalServerError)
+		}
+		return
+	}
+
+	// Use the standard JoinGroup logic by creating a temporary request
+	// Check subscription tier and group join limit
+	tier := GetUserSubscriptionTier(userID)
+	limits := tierLimits[tier]
+	joinedCount, err := GetUserJoinedGroupCount(userID)
+	if err != nil {
+		log.Printf("Error getting joined group count: %v", err)
+		http.Error(w, "server error", http.StatusInternalServerError)
+		return
+	}
+
+	if joinedCount >= limits.MaxGroups {
+		tierStr := string(tier)
+		if tierStr == "free" {
+			tierStr = "Free"
+		} else if tierStr == "pro" {
+			tierStr = "Pro"
+		} else {
+			tierStr = "Ultra"
+		}
+		errorMsg := fmt.Sprintf("group limit reached for %s tier (%d/%d). Upgrade your subscription to join more groups", tierStr, joinedCount, limits.MaxGroups)
+		http.Error(w, errorMsg, http.StatusForbidden)
+		return
+	}
+
+	// Check if group exists and requires admin approval
+	var requireApproval bool
+	err = db.DB.QueryRow(`SELECT require_admin_approval FROM groups WHERE id=$1`, groupID).Scan(&requireApproval)
+	if err != nil {
+		http.Error(w, "group not found", http.StatusNotFound)
+		return
+	}
+
+	// Check if user is already a member
+	var isMember bool
+	err = db.DB.QueryRow(`SELECT EXISTS(SELECT 1 FROM group_members WHERE group_id=$1 AND user_id=$2)`, groupID, userID).Scan(&isMember)
+	if isMember {
+		http.Error(w, "already a member of this group", http.StatusConflict)
+		return
+	}
+
+	// Check if there's already a pending request
+	var hasPendingRequest bool
+	err = db.DB.QueryRow(`SELECT EXISTS(SELECT 1 FROM join_requests WHERE group_id=$1 AND user_id=$2 AND status='pending')`, groupID, userID).Scan(&hasPendingRequest)
+	if hasPendingRequest {
+		http.Error(w, "you already have a pending join request", http.StatusConflict)
+		return
+	}
+
+	if requireApproval {
+		// Create a join request instead of directly joining
+		_, err = db.DB.Exec(
+			`INSERT INTO join_requests (group_id, user_id, status) VALUES ($1, $2, 'pending') ON CONFLICT (group_id, user_id) DO UPDATE SET status='pending'`,
+			groupID, userID,
+		)
+		if err != nil {
+			log.Printf("Error creating join request: %v", err)
+			http.Error(w, "db error", http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(map[string]string{"message": "join request sent", "status": "pending"})
+	} else {
+		// Direct join - insert membership
+		_, err = db.DB.Exec(
+			`INSERT INTO group_members (group_id, user_id) VALUES ($1, $2) ON CONFLICT (group_id, user_id) DO NOTHING`,
+			groupID, userID,
+		)
+		if err != nil {
+			log.Printf("Error joining group: %v", err)
+			http.Error(w, "db error", http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(map[string]string{"message": "joined"})
+	}
 }

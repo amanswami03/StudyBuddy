@@ -145,11 +145,7 @@ func UpdateProfile(w http.ResponseWriter, r *http.Request) {
 	args := []interface{}{}
 	argCount := 1
 
-	if req.Username != nil {
-		setParts = append(setParts, "username=$"+strconv.Itoa(argCount))
-		args = append(args, *req.Username)
-		argCount++
-	}
+	// Note: Username is intentionally NOT included in updates - it's immutable
 	if req.ProfilePic != nil {
 		setParts = append(setParts, "profile_pic=$"+strconv.Itoa(argCount))
 		args = append(args, *req.ProfilePic)

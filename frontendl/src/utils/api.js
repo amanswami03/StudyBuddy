@@ -188,6 +188,18 @@ export const rejectJoinRequest = (groupId, requestId, reason = '') =>
     body: JSON.stringify({ reason }),
   });
 
+// Get group invite code
+export const getGroupInviteCode = (groupId) =>
+  apiCall(`/api/groups/${groupId}/invite`, {
+    method: 'GET',
+  });
+
+// Join group by invite code
+export const joinGroupByInviteCode = (inviteCode) =>
+  apiCall(`/api/groups/invite/${inviteCode}`, {
+    method: 'POST',
+  });
+
 // Get group messages
 export const getGroupMessages = (groupId) =>
   apiCall(`/api/groups/${groupId}/messages`);

@@ -51,6 +51,8 @@ func RegisterRoutes(r *mux.Router) {
 	r.HandleFunc("/api/groups/{id:[0-9]+}/join-requests", handlers.GetJoinRequests).Methods("GET")
 	r.HandleFunc("/api/groups/{id:[0-9]+}/join-requests/{requestId:[0-9]+}/approve", handlers.ApproveJoinRequest).Methods("POST")
 	r.HandleFunc("/api/groups/{id:[0-9]+}/join-requests/{requestId:[0-9]+}/reject", handlers.RejectJoinRequest).Methods("POST")
+	r.HandleFunc("/api/groups/{id:[0-9]+}/invite", handlers.GetGroupInviteCode).Methods("GET")
+	r.HandleFunc("/api/groups/invite/{code}", handlers.JoinGroupByInvite).Methods("POST")
 
 	// Points & Ranking
 	r.HandleFunc("/api/user/stats", handlers.GetUserStats).Methods("GET")

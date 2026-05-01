@@ -74,6 +74,7 @@ export default function UserProfile() {
         if (photoUrl && !photoUrl.startsWith('http')) photoUrl = `${API_BASE}${photoUrl}`;
 
         setUser({
+          username: profileData?.username || localStorage.getItem('sb_username') || 'user',
           name: profileData?.username || profileData?.email || localStorage.getItem('sb_username') || 'User',
           email: profileData?.email || localStorage.getItem('sb_email') || '',
           avatar: ((profileData?.username || 'U').charAt(0)).toUpperCase(),
@@ -101,7 +102,7 @@ export default function UserProfile() {
         setRankThresholds(ranksData || defaultRanks);
       } catch (err) {
         const fallbackName = localStorage.getItem('sb_username') || 'User';
-        setUser({ name: fallbackName, email: localStorage.getItem('sb_email') || '', avatar: (fallbackName).charAt(0).toUpperCase(), photoUrl: null, phone: '', location: '', university: '', bio: '', showEmail: false, showPhone: false, showLocation: false, showUniversity: false, showBio: false, stats: { totalStudyHours: 0, sessionsAttended: 0, groupsJoined: 0, resourcesShared: 0, currentStreak: 0, longestStreak: 0, totalPoints: 0, currentRank: 'Beginner' } });
+        setUser({ username: fallbackName, name: fallbackName, email: localStorage.getItem('sb_email') || '', avatar: (fallbackName).charAt(0).toUpperCase(), photoUrl: null, phone: '', location: '', university: '', bio: '', showEmail: false, showPhone: false, showLocation: false, showUniversity: false, showBio: false, stats: { totalStudyHours: 0, sessionsAttended: 0, groupsJoined: 0, resourcesShared: 0, currentStreak: 0, longestStreak: 0, totalPoints: 0, currentRank: 'Beginner' } });
         setRankThresholds(defaultRanks);
       } finally { setLoading(false); }
     };
@@ -339,6 +340,7 @@ export default function UserProfile() {
             <div className="pl-36 pt-3 flex items-start justify-between flex-wrap gap-3">
               <div>
                 <h1 className={`text-2xl font-extrabold ${isDark ? 'text-white' : 'text-slate-800'}`}>{user.name}</h1>
+                <p className={`text-sm font-medium mt-0.5 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>@{user.username}</p>
                 {(!isViewingOther || user.showEmail) && user.email && (
                   <p className={`text-sm mt-0.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{user.email}</p>
                 )}

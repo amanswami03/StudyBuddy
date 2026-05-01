@@ -90,6 +90,7 @@ func runMigrations() {
 		"migrate_groups.sql",
 		"migrate_groups_v2.sql",
 		"migrate_join_requests.sql",
+		"migrate_group_invites.sql",
 		"migrate_study_sessions.sql",
 		"migrate_scheduled_group_sessions.sql",
 		"migrate_points.sql",
