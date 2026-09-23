@@ -1,7 +1,12 @@
--- Add missing columns to messages table
+-- Add legacy and current columns required by the chat code.
+ALTER TABLE messages ADD COLUMN IF NOT EXISTS sender TEXT;
 ALTER TABLE messages ADD COLUMN IF NOT EXISTS sender_id INTEGER;
 ALTER TABLE messages ADD COLUMN IF NOT EXISTS sender_name VARCHAR(100);
 ALTER TABLE messages ADD COLUMN IF NOT EXISTS message_type VARCHAR(50) DEFAULT 'text';
+
+UPDATE messages
+SET sender = sender_name
+WHERE sender IS NULL AND sender_name IS NOT NULL;
 
 DO $$
 BEGIN
