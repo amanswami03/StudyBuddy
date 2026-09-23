@@ -1,7 +1,21 @@
--- Add sender_id column to messages table if it doesn't exist
+-- Repair the messages table for the newer code paths that expect sender_id + sender_name + message_type.
 ALTER TABLE messages ADD COLUMN IF NOT EXISTS sender_id INTEGER;
+ALTER TABLE messages ADD COLUMN IF NOT EXISTS sender_name VARCHAR(100);
+ALTER TABLE messages ADD COLUMN IF NOT EXISTS message_type VARCHAR(50) DEFAULT 'text';
 
--- Add foreign key constraint if sender_id was just added
+-- Keep compatibility with older tables that stored group_id as text.
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_name = 'messages' AND column_name = 'group_id' AND data_type = 'text'
+  ) THEN
+    ALTER TABLE messages ALTER COLUMN group_id TYPE INTEGER USING group_id::INTEGER;
+  END IF;
+END $$;
+
+-- Add foreign key constraint if sender_id was just added.
 DO $$
 BEGIN
   IF NOT EXISTS (
